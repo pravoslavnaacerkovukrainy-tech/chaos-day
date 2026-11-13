@@ -56,12 +56,16 @@ for (const viewport of [
       deadline,
       review_date: reviewDate,
     });
+    await expect(card(page, text)).toHaveCount(0);
+    await expect(page.getByTestId('plan-empty')).toBeVisible();
 
     await navigate(page, 'Все задачи');
     await card(page, text).getByTestId('task-reschedule').click();
     await card(page, text).getByTestId('reschedule-today').click();
+    await expect(card(page, text).getByTestId('task-day')).toContainText(/сегодня/i);
 
     await navigate(page, 'План');
+    await expect(card(page, text)).toBeVisible();
     await card(page, text).getByTestId('task-complete').click();
 
     state = await snapshot(page);
@@ -82,5 +86,15 @@ for (const viewport of [
     state = await snapshot(page);
     expect(state.tasks.find((item) => item.id === task?.id)?.day).toBe(today);
     expect(state.chaos).toHaveLength(0);
+
+    const logout = page.getByTestId('logout');
+    if (!(await logout.isVisible())) {
+      await page.getByTestId('nav-toggle').click();
+    }
+    await expect(logout).toBeVisible();
+    await logout.click();
+    await expect(page.getByTestId('login-form')).toBeVisible();
+    await expect(page.getByTestId('login-password')).toBeVisible();
+    expect((await page.request.get('/api/state')).status()).toBe(401);
   });
 }

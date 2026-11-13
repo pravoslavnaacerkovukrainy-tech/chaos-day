@@ -462,7 +462,7 @@ interface ImportReport {
 | Метод и путь | Тело | Назначение |
 |---|---|---|
 | `POST /api/dev/reset` | — | Полностью очищает хранилище, включая пароль и сессии. Ответ `{"ok":true,"data":{"reset":true,"setup_required":true}}`. |
-| `POST /api/dev/bootstrap` | `{"password":string,"timezone"?:string}` | Сброс + задание пароля одним вызовом, чтобы сценарий не зависел от порядка. |
+| `POST /api/dev/bootstrap` | `{"password":string,"timezone"?:string}` | Сброс + задание пароля одним вызовом, чтобы сценарий не зависел от порядка. Сразу выдаёт cookie сессии, поэтому следующий запрос уже авторизован. |
 | `POST /api/dev/fault` | `{"inject":"save","times":number}` | Следующие N записей в хранилище завершатся ошибкой `500 save_failed` и полным откатом. Нужно для проверки «ошибка сохранения» и атомарности разбора строки. |
 | `GET /api/dev/now` | `?shift_days=number` | Не меняет данные; возвращает `{"ok":true,"data":{"today":DayKey,"now":Iso}}` для сверки календарной логики. |
 

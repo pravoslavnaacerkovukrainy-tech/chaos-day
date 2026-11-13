@@ -92,4 +92,4 @@
 Node 24 и встроенный `node:sqlite`, TypeScript, единый npm-проект без рантайм-зависимостей.
 Сервер запускается напрямую (Node 24 снимает типы без сборки), клиент — `client/index.html`,
 `client/src/`, сборка Vite в `client/dist`, которую сервер раздаёт на том же origin.
-Команды и переменные окружения — в [`README.md`](../README.md) и в контракте.
+Команды и переменные окружения — в [`docs/local-development.md`](local-development.md) и в контракте.

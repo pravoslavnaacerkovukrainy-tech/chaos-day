@@ -32,6 +32,11 @@ export const app = {
   /** Черновики полей ввода по ключу. Живут до перезагрузки страницы и в экспорт не попадают. */
   drafts: new Map<string, string>(),
   rerender: () => {},
+  /**
+   * Версия данных. Растёт после каждого успешного изменения, ещё до прихода свежего снимка:
+   * выборки сервера (План, Обзор), полученные раньше, становятся недействительными.
+   */
+  version: 0,
 };
 
 export function snap(): Snapshot {
@@ -63,6 +68,7 @@ export async function refresh(): Promise<void> {
 export async function run<T>(action: () => Promise<T>, success?: string): Promise<T | undefined> {
   try {
     const result = await action();
+    app.version++;
     hideError();
     if (success) say(success);
     await refresh();

@@ -1,6 +1,6 @@
 // «Обзор»: шесть групп в порядке методики. Порядок и состав задаёт сервер.
 import { api } from "../api.ts";
-import { snap } from "../app.ts";
+import { app, snap } from "../app.ts";
 import { shortDate } from "../dates.ts";
 import { h } from "../dom.ts";
 import { taskRow } from "../task.ts";
@@ -8,19 +8,20 @@ import type { ReviewGroup, ReviewItem } from "../types.ts";
 import { showError } from "../ui.ts";
 import { EMPTY, header } from "./common.ts";
 
-let cache: { stamp: string; groups: ReviewGroup[] } | null = null;
+let cache: { version: number; groups: ReviewGroup[] } | null = null;
 
 export function reviewView(): HTMLElement {
-  const s = snap();
-  const stamp = s.now + ":" + s.tasks.map((t) => t.updated_at).join("") + s.projects.map((p) => p.updated_at).join("");
+  const version = app.version;
   const body = h("ol", { class: "route", testid: "review-groups", "aria-label": "Группы пересмотра" });
   const fill = (groups: ReviewGroup[]) => body.replaceChildren(...groups.map((g, i) => groupNode(g, i + 1)));
-  if (cache) fill(cache.groups);
-  else body.append(h("li", { class: "quiet" }, "Загрузка…"));
-  if (!cache || cache.stamp !== stamp) {
+  const fresh = cache !== null && cache.version === version;
+  if (fresh) fill(cache!.groups);
+  else body.append(h("li", { class: "quiet", testid: "review-loading" }, "Загрузка…"));
+  if (!fresh) {
     body.setAttribute("aria-busy", "true");
     api.review().then((r) => {
-      cache = { stamp, groups: r.groups };
+      if (version !== app.version) return; // ответ на запрос до изменения
+      cache = { version, groups: r.groups };
       body.removeAttribute("aria-busy");
       if (body.isConnected) fill(r.groups);
     }, (err) => {

@@ -34,6 +34,8 @@ export interface Task {
   entry_id: UUID | null;
   created_at: Iso;
   updated_at: Iso;
+  /** Счётчик версий задачи на сервере; растёт при любой записи. Старый сервер может не прислать. */
+  revision?: number;
   is_completed: boolean;
   is_removed: boolean;
   is_open: boolean;

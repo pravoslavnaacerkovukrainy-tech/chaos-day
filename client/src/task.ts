@@ -195,6 +195,15 @@ export function openRemoveDialog(task: Task): void {
 
 // ───────────────────────── редактор задачи ─────────────────────────
 
+const TASK_CONFLICT_MESSAGE =
+  "Задачу изменили в другом месте, пока это окно было открыто. Ваши правки не сохранены и остались в полях ниже — " +
+  "скопируйте нужное, затем закройте окно и откройте задачу заново: там будет свежая версия. " +
+  "Повторное сохранение отсюда отключено, чтобы не затереть чужую правку.";
+
+function isConflict(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409 && err.code === "conflicting_changes";
+}
+
 export interface EditorOptions {
   task?: Task;
   chaos?: ChaosItem;
@@ -305,7 +314,13 @@ export function openTaskEditor(opts: EditorOptions): void {
     details: clean(details.value),
   });
 
+  // Версия той задачи, которую человек видит в этом окне. Именно её сервер сверит при записи:
+  // если задачу успели изменить в другом месте, PATCH вернёт 409 и ничего не затрёт.
+  const baseRevision = task?.revision;
+  let conflicted = false;
+
   const save = button("Сохранить", async () => {
+    if (conflicted) return;
     const d = draft();
     if (!d.text) {
       modal.setError(new ApiError(400, "empty_text", "Напишите действие одной строкой."));
@@ -316,14 +331,24 @@ export function openTaskEditor(opts: EditorOptions): void {
     modal.setError(null);
     try {
       if (chaos) await api.chaosToTask(chaos.id, d);
-      else if (task) await api.updateTask(task.id, d);
+      else if (task) await api.updateTask(task.id, d, baseRevision);
       else await api.createTask(d);
       modal.close();
       await run(async () => undefined, chaos ? "Строка стала задачей" : task ? "Задача сохранена" : "Задача добавлена");
     } catch (err) {
       // Строка места хаоса остаётся на месте с прежним id: сервер откатил разбор целиком.
-      modal.setError(err);
       modal.setBusy(false);
+      if (task && isConflict(err)) {
+        // Черновик остаётся в полях окна. Повторно не отправляем: та же версия снова
+        // получит отказ, а без проверки запись затёрла бы чужую правку.
+        conflicted = true;
+        save.disabled = true;
+        save.removeAttribute("data-submit");
+        modal.dialog.setAttribute("data-conflict", "true");
+        modal.setError(new ApiError(409, "conflicting_changes", TASK_CONFLICT_MESSAGE));
+        return;
+      }
+      modal.setError(err);
     }
   }, { class: "primary", testid: "task-save", "data-submit": true });
 
@@ -363,12 +388,12 @@ function stepsEditor(task: Task, closeEditor: () => void): HTMLElement {
     }
     saveBtn.disabled = true;
     try {
-      await api.saveSteps(task.id, cleaned, task.updated_at);
+      await api.saveSteps(task.id, cleaned, { revision: task.revision, updated_at: task.updated_at });
       closeEditor();
       await run(async () => undefined, "Шаги сохранены");
     } catch (e) {
-      err.textContent = e instanceof ApiError && e.code === "conflicting_changes"
-        ? "Список шагов изменился в другом месте. Ваши правки остались здесь; закройте окно и откройте задачу заново, чтобы загрузить свежий список."
+      err.textContent = isConflict(e)
+        ? "Задачу изменили в другом месте, пока окно было открыто. Шаги не сохранены, ваши правки остались здесь; закройте окно и откройте задачу заново, чтобы загрузить свежую версию."
         : e instanceof Error ? e.message : "Не удалось сохранить шаги.";
       err.hidden = false;
       saveBtn.disabled = false;

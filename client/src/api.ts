@@ -106,7 +106,13 @@ export const api = {
   deleteChaos: (chaosId: UUID) => del<{ removed_chaos_id: UUID }>(`/api/chaos/${id(chaosId)}`),
 
   createTask: (draft: TaskDraft) => post<{ task: Task }>("/api/tasks", draft),
-  updateTask: (taskId: UUID, draft: Partial<TaskDraft>) => patch<{ task: Task }>(`/api/tasks/${id(taskId)}`, draft),
+  /**
+   * baseRevision — версия задачи, которую видел открытый редактор. Сервер откажет 409
+   * conflicting_changes, если задачу с тех пор изменили; повтор не делается автоматически.
+   */
+  updateTask: (taskId: UUID, draft: Partial<TaskDraft>, baseRevision?: number) =>
+    patch<{ task: Task }>(`/api/tasks/${id(taskId)}`,
+      typeof baseRevision === "number" ? { ...draft, base_revision: baseRevision } : draft),
   reschedule: (taskId: UUID, day: DayKey | "") =>
     post<{ task: Task }>(`/api/tasks/${id(taskId)}/reschedule`, { day }),
   complete: (taskId: UUID) => post<{ task: Task; entry: DiaryEntry }>(`/api/tasks/${id(taskId)}/complete`),
@@ -118,8 +124,11 @@ export const api = {
   returnToWork: (taskId: UUID) => post<{ task: Task }>(`/api/tasks/${id(taskId)}/return-to-work`),
   setAtRisk: (taskId: UUID, atRisk: boolean) =>
     post<{ task: Task }>(`/api/tasks/${id(taskId)}/at-risk`, { at_risk: atRisk }),
-  saveSteps: (taskId: UUID, steps: TaskStep[], baseUpdatedAt: Iso) =>
-    post<{ task: Task }>(`/api/tasks/${id(taskId)}/steps`, { steps, base_updated_at: baseUpdatedAt }),
+  saveSteps: (taskId: UUID, steps: TaskStep[], base: { revision?: number; updated_at: Iso }) =>
+    post<{ task: Task }>(`/api/tasks/${id(taskId)}/steps`,
+      typeof base.revision === "number"
+        ? { steps, base_revision: base.revision }
+        : { steps, base_updated_at: base.updated_at }),
   deleteTask: (taskId: UUID) => del<{ removed_task_id: UUID }>(`/api/tasks/${id(taskId)}`),
 
   createProject: (draft: ProjectDraft) => post<{ project: Project }>("/api/projects", draft),

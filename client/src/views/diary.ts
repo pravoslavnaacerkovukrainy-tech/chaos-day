@@ -69,6 +69,14 @@ export function diaryView(): HTMLElement {
 
   const picker = h("input", { type: "date", value: day, testid: "diary-date", "aria-label": "Выбрать день" });
   picker.addEventListener("change", () => isDayKey(picker.value) && setDay(picker.value));
+  // Дни, где есть записи: после импорта прежние дни находятся без листания.
+  const counts = new Map<string, number>();
+  for (const e of s.entries) counts.set(e.day, (counts.get(e.day) ?? 0) + 1);
+  const days = [...counts.keys()].sort().reverse();
+  const jump = h("select", { testid: "diary-days", "aria-label": "Дни с записями" },
+    h("option", { value: "" }, days.length ? `Дни с записями: ${days.length}` : "Записей пока нет"),
+    days.map((d) => h("option", { value: d }, `${shortDate(d, t)} · ${counts.get(d)}`)));
+  jump.addEventListener("change", () => jump.value && setDay(jump.value));
 
   return h("section", { class: "view", "aria-labelledby": "view-title" },
     header("Дневник", "view-diary", h("div", { class: "search", role: "search" }, search)),
@@ -76,7 +84,7 @@ export function diaryView(): HTMLElement {
       button("‹", () => setDay(addDays(day, -1)), { class: "ghost icon", "aria-label": "Предыдущий день", testid: "diary-prev" }),
       button("Сегодня", () => setDay(t), { class: day === t ? "pill active" : "pill", testid: "diary-today", "aria-pressed": String(day === t) }),
       button("›", () => setDay(addDays(day, 1)), { class: "ghost icon", "aria-label": "Следующий день", testid: "diary-next" }),
-      picker),
+      picker, jump),
     h("div", { class: "day-title" },
       h("h2", { testid: "diary-day-title" }, dayLabel(day, t)),
       h("span", { class: "quiet" }, shortDate(day, t) + ", " + weekday(day))),

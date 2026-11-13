@@ -183,7 +183,7 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 
 /* ── план ── */
 .day-nav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.day-nav input[type=date] { width: auto; }
+.day-nav input[type=date], .day-nav select { width: auto; max-width: 100%; }
 .day-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .search { display: flex; flex-direction: column; gap: 6px; }
 .search-toggles { display: flex; gap: 16px; font-size: 0.875rem; color: var(--quiet); }

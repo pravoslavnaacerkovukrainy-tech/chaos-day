@@ -97,7 +97,7 @@
 ## Дневник
 
 `diary-input`, `diary-context-input`, `diary-time-input`, `diary-save`, `diary-prev`, `diary-today`, `diary-next`,
-`diary-date`, `diary-day-title`, `diary-list`, `diary-empty`, `diary-entry`, `diary-entry-text`, `diary-entry-context`,
+`diary-date`, `diary-days` (дни с записями), `diary-day-title`, `diary-list`, `diary-empty`, `diary-entry`, `diary-entry-text`, `diary-entry-context`,
 `diary-entry-edit`, `diary-entry-delete`, `diary-search`, `diary-search-results`, `diary-search-count`,
 окно `entry-editor`: `entry-text-input`, `entry-context-input`, `entry-save`, `entry-cancel`.
 

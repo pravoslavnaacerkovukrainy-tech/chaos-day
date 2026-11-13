@@ -28,9 +28,9 @@ export default defineConfig({
       use: { browserName: 'firefox' },
     },
   ],
-  webServer: {
+  webServer: process.env.ACCEPTANCE_EXTERNAL_SERVER === '1' ? undefined : {
     command: 'npm run dev',
-    cwd: path.resolve(acceptanceDir, '..'),
+    cwd: process.env.ACCEPTANCE_SERVER_DIR ?? path.resolve(acceptanceDir, '..'),
     url: `${baseURL}/api/health`,
     reuseExistingServer: true,
     timeout: 30_000,

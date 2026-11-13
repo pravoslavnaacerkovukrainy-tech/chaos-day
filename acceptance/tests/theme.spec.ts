@@ -83,6 +83,19 @@ test('узкое окно: переключатель в перечне разд
   await expectTheme(page, 'dark');
 });
 
+test('узкое короткое окно: тост «Записано…» не закрывает переключатель в открытых разделах', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await login(page);
+  await page.getByTestId('chaos-input').fill('Проверка тоста');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('status')).toHaveText('Записано в место хаоса');
+  await page.getByTestId('nav-toggle').click();
+  await expect(page.getByTestId('theme-switch')).toBeInViewport();
+  await expect.poll(() => page.getByTestId('status').evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
+  await page.getByTestId('theme-light').click();
+  await expectTheme(page, 'light');
+});
+
 test('сохранённая светлая ставится до первой отрисовки, без вспышки тёмной', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('theme-light').click();

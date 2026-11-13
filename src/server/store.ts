@@ -374,6 +374,24 @@ function normalizeStepsBase(base: StepsBase | string | null | undefined): StepsB
   return base;
 }
 
+/** Основание для оптимистичной блокировки обычной правки задачи. */
+export interface TaskBase {
+  /** Счётчик правок из `Task.revision`, который клиент получил, открывая редактор. */
+  revision?: unknown;
+}
+
+/**
+ * Отсутствие, `null` и пустая строка означают «условия нет»: правка проходит прежним
+ * порядком, поэтому старые вызывающие ничего не присылают и не ломаются.
+ */
+function optionalRevision(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new ApiError(400, 'invalid_request', 'base_revision: ожидается целое неотрицательное число.');
+  }
+  return value;
+}
+
 /* ------------------------------------------------------------------ */
 /* Хранилище                                                           */
 /* ------------------------------------------------------------------ */
@@ -823,10 +841,20 @@ export class Store {
     return row;
   }
 
-  updateTask(id: string, draft: TaskDraft): Task {
+  /**
+   * Обычная правка задачи. С `base_revision` работает оптимистичная блокировка: счётчик
+   * сравнивается с текущим в той же транзакции, что и UPDATE, поэтому открытый раньше
+   * редактор не затирает чужую правку, а получает отказ и сохраняет свой черновик.
+   * Без условия поведение прежнее.
+   */
+  updateTask(id: string, draft: TaskDraft, base?: TaskBase): Task {
     const taskId = requireId(id, 'Идентификатор задачи');
+    const revision = optionalRevision(base?.revision);
     return this.tx(() => {
       const row = this.mutableTaskRow(taskId);
+      if (revision !== null && revision !== num(row, 'revision')) {
+        throw new ApiError(409, 'conflicting_changes', MESSAGES.conflictingTaskChanges);
+      }
       const now = this.nowMs();
       const next = this.resolveTaskFields(draft, this.taskToValues(this.mapTask(row)), now);
       this.updateTaskValues(next);

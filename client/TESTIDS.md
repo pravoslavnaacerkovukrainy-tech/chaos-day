@@ -13,6 +13,7 @@
 | `nav-chaos`, `nav-plan`, `nav-projects`, `nav-waiting`, `nav-review`, `nav-tasks`, `nav-notes`, `nav-diary`, `nav-data` | Ссылки разделов; активная с `aria-current="page"`. Адрес — `#/<раздел>` |
 | `nav-toggle` | Кнопка «Разделы» на узком окне (≤ 860 px), `aria-expanded` |
 | `logout` | «Выйти» |
+| `theme-switch`, `theme-dark`, `theme-light` | Переключатель «Тема: Тёмная / Светлая» (`role=radiogroup`, выбранная — `aria-checked="true"`): внизу перечня разделов (на узком окне — внутри «Разделы») и на экране входа. По умолчанию тёмная независимо от ОС; выбор хранится в браузере (`localStorage["chaos-day-theme"]`) и переживает обновление и выход. Светлая — `<html data-theme="light">` |
 | `status` | Строка подтверждения (`role=status`), например «Записано в место хаоса» |
 | `error`, `error-dismiss` | Красная строка ошибки (`role=alert`) и «Закрыть» |
 | `area-filter`, `area-all`, `area-work`, `area-personal` | Фильтр «Все / Работа / Личное» |

@@ -1,4 +1,5 @@
-/* Тёмная тема по умолчанию, независимо от настроек ОС. Графитово-синие поверхности,
+/* Тёмная тема по умолчанию, независимо от настроек ОС; светлая — только по явному выбору
+   (html[data-theme="light"], ставится до первой отрисовки в index.html). Графитово-синие поверхности,
    приглушённые разделители, синий — только действия и выбор. Сигнальная охра — только
    «Не может ждать», «Обещание под угрозой» и группа «Под угрозой». Ошибки — красный.
    Зелёного «выполнено» нет. Контраст текста к фону: --ink ≈ 14:1, --quiet ≈ 7:1, --accent ≈ 7:1; границы полей --edge ≥ 3:1. */
@@ -18,11 +19,43 @@
   --signal: #e3a54a;
   --error: #ff8077;
   --error-bg: #3a1e22;
+  --accent-hover: #8cbdf0;
+  --placeholder: #7f8d9b;
+  --shadow-menu: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --backdrop: rgba(6, 10, 15, 0.66);
   --radius: 8px;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --serif: "New York", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
+}
+
+/* Светлая — та же система при дневном свете: холодная бумага вместо графита, тот же синий,
+   охра темнее, чтобы читаться текстом. Контраст к --pane: --ink ≈ 15:1, --quiet ≈ 6.5:1,
+   --accent ≈ 6:1, --signal ≈ 5.5:1, --error ≈ 6:1; --edge к полю ≈ 3.7:1. */
+:root[data-theme="light"] {
+  --canvas: #eef2f6;
+  --pane: #f7f9fb;
+  --raise: #ffffff;
+  --ink: #16202b;
+  --quiet: #4d5b6a;
+  --accent: #1d5fa3;
+  --accent-ink: #ffffff;
+  --accent-soft: #d9e6f4;
+  --rail: #d3dbe4;
+  --edge: #76869a;
+  --field: #ffffff;
+  --focus: #1d5fa3;
+  --signal: #94570a;
+  --error: #b3261e;
+  --error-bg: #fbe6e4;
+  --accent-hover: #174f8a;
+  --placeholder: #68768a;
+  --shadow-menu: 0 10px 30px rgba(22, 32, 43, 0.16);
+  --shadow-modal: 0 24px 60px rgba(22, 32, 43, 0.22);
+  --backdrop: rgba(22, 32, 43, 0.42);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -66,7 +99,15 @@ h1:focus, main:focus { outline: none; }
 .nav-link.active { background: var(--accent-soft); color: var(--ink); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
 .nav-count { color: var(--quiet); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
 .nav-body { display: flex; flex-direction: column; gap: 12px; flex: 1; }
-.nav-foot { margin-top: auto; padding: 0 10px; }
+.nav-foot { margin-top: auto; padding: 0 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.nav-foot .link { padding-left: 0; }
+/* Тема: подпись и пара «Тёмная | Светлая». Выбор видно сразу — заливкой, как у фильтра «Работа / Личное». */
+.theme-switch { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.theme-label { font-size: 0.875rem; color: var(--quiet); }
+.theme-options button { padding: 4px 12px; font-size: 0.875rem; }
+.theme-options button:not([aria-checked=true]):hover { background: var(--raise); }
+.theme-options button:focus-visible { outline-offset: -4px; }
+.login-form .theme-switch { margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--rail); }
 .capture-slot.side { padding: 0 2px; }
 .capture-slot.side .capture-open { width: 100%; }
 .capture-slot:empty { display: none; }
@@ -94,7 +135,7 @@ button, .button, summary.ghost {
 button:hover, .button:hover { border-color: var(--quiet); }
 button:disabled { opacity: 0.55; cursor: default; }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-button.primary:hover { background: #8cbdf0; border-color: #8cbdf0; }
+button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 button.ghost, summary.ghost { background: transparent; border-color: transparent; color: var(--accent); }
 button.ghost:hover, summary.ghost:hover { border-color: var(--rail); background: var(--raise); }
 button.link { background: none; border: none; padding: 2px 4px; min-height: auto; color: var(--accent); text-decoration: underline; }
@@ -109,7 +150,7 @@ input[type=text], input[type=search], input[type=password], input[type=date], in
 }
 textarea { resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
-input::placeholder, textarea::placeholder { color: #7f8d9b; }
+input::placeholder, textarea::placeholder { color: var(--placeholder); }
 input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
 
 .field { display: flex; flex-direction: column; gap: 4px; }
@@ -169,7 +210,7 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .menu-list {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 240px;
   background: var(--raise); border: 1px solid var(--edge); border-radius: var(--radius);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); padding: 6px; display: flex; flex-direction: column; gap: 4px;
+  box-shadow: var(--shadow-menu); padding: 6px; display: flex; flex-direction: column; gap: 4px;
 }
 .menu-list > button { justify-content: flex-start; border-color: transparent; }
 .menu-list > button:hover { background: var(--accent-soft); }
@@ -285,9 +326,9 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .modal {
   border: 1px solid var(--rail); border-radius: 12px; padding: 20px; width: min(620px, calc(100vw - 24px));
   max-height: calc(100vh - 24px); overflow: auto; color: var(--ink); background: var(--pane);
-  border-color: var(--edge); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  border-color: var(--edge); box-shadow: var(--shadow-modal);
 }
-.modal::backdrop { background: rgba(6, 10, 15, 0.66); }
+.modal::backdrop { background: var(--backdrop); }
 .modal-title { margin-bottom: 8px; }
 .modal-body { display: flex; flex-direction: column; gap: 12px; }
 .extra { border-top: 1px solid var(--rail); padding-top: 8px; }
@@ -335,7 +376,7 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
     transform: translateX(-105%); transition: transform 0.15s; visibility: hidden;
   }
   .nav-open .sidebar { transform: none; visibility: visible; }
-  .nav-open .scrim { display: block; position: fixed; inset: 0; background: rgba(6, 10, 15, 0.66); z-index: 35; }
+  .nav-open .scrim { display: block; position: fixed; inset: 0; background: var(--backdrop); z-index: 35; }
   .nav-link { min-height: 44px; }
   .content { padding: 18px 14px 80px; }
   .notes-layout { grid-template-columns: 1fr; }

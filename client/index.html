@@ -7,6 +7,16 @@
     <meta name="referrer" content="no-referrer" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#131a22" />
+    <script>
+      // Тема до первой отрисовки, чтобы не мигнуть тёмной при выбранной светлой. Ключ — THEME_KEY в src/theme.ts.
+      try {
+        if (localStorage.getItem("chaos-day-theme") === "light") {
+          document.documentElement.dataset.theme = "light";
+          document.querySelector('meta[name="color-scheme"]').content = "light";
+          document.querySelector('meta[name="theme-color"]').content = "#eef2f6";
+        }
+      } catch (e) {}
+    </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>Хаос Дня</title>
   </head>

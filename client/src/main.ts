@@ -3,6 +3,7 @@ import { api, ApiError, setUnauthorizedHandler } from "./api.ts";
 import { app, loadSnapshot, ROUTES, type Route } from "./app.ts";
 import { openCapture } from "./capture.ts";
 import { button, clear, field, h } from "./dom.ts";
+import { initTheme, themeSwitch } from "./theme.ts";
 import { errorText, hideError, mountChrome, say } from "./ui.ts";
 import { chaosView } from "./views/chaos.ts";
 import { dataView } from "./views/data.ts";
@@ -47,7 +48,7 @@ async function showLogin(): Promise<void> {
     setup = (await api.authState()).setup_required;
   } catch (err) {
     root.append(h("main", { class: "login" }, h("p", { class: "form-error", role: "alert" }, errorText(err)),
-      button("Повторить", () => void boot(), { class: "primary" })));
+      button("Повторить", () => void boot(), { class: "primary" }), themeSwitch()));
     return;
   }
   const password = h("input", { type: "password", testid: "login-password", autocomplete: setup ? "new-password" : "current-password", required: true, minlength: setup ? 8 : undefined });
@@ -65,7 +66,8 @@ async function showLogin(): Promise<void> {
     error,
     field("Пароль", password),
     repeat ? field("Повторите пароль", repeat) : null,
-    submit);
+    submit,
+    themeSwitch());
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     error.hidden = true;
@@ -153,6 +155,7 @@ function renderNav(route: Route): void {
         h("span", null, r.title),
         counts[r.id] ? h("span", { class: "nav-count", "aria-hidden": "true" }, String(counts[r.id])) : null)))),
     h("div", { class: "nav-foot" },
+      themeSwitch(),
       button("Выйти", async () => {
         try {
           await api.logout();
@@ -231,6 +234,7 @@ async function boot(): Promise<void> {
   render();
 }
 
+initTheme();
 app.rerender = render;
 setUnauthorizedHandler(() => void showLogin());
 window.addEventListener("hashchange", () => render());

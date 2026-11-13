@@ -1,38 +1,28 @@
-/* Токены из DESIGN.md Mac 0.2.14. Сигнальная охра — только «Не может ждать»,
-   «Обещание под угрозой» и группа «Под угрозой». Ошибки — обычный красный. Зелёного «выполнено» нет. */
+/* Тёмная тема по умолчанию, независимо от настроек ОС. Графитово-синие поверхности,
+   приглушённые разделители, синий — только действия и выбор. Сигнальная охра — только
+   «Не может ждать», «Обещание под угрозой» и группа «Под угрозой». Ошибки — красный.
+   Зелёного «выполнено» нет. Контраст текста к фону: --ink ≈ 14:1, --quiet ≈ 7:1, --accent ≈ 7:1; границы полей --edge ≥ 3:1. */
 :root {
-  --canvas: #ffffff;
-  --pane: #f3f5f7;
-  --ink: #263747;
-  --quiet: #5e6b78;
-  --accent: #2f6690;
-  --accent-ink: #ffffff;
-  --rail: #dce5ec;
-  --field: #f5f8fa;
-  --signal: #a35a00;
-  --error: #c62828;
-  --error-bg: #fdecea;
+  --canvas: #131a22;
+  --pane: #18212b;
+  --raise: #1e2833;
+  --ink: #e3e9ef;
+  --quiet: #98a6b4;
+  --accent: #72aeea;
+  --accent-ink: #08131e;
+  --accent-soft: #1d3247;
+  --rail: #26313d;
+  --edge: #606f82;
+  --field: #1a232d;
+  --focus: #a9d0ff;
+  --signal: #e3a54a;
+  --error: #ff8077;
+  --error-bg: #3a1e22;
   --radius: 8px;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --serif: "New York", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --canvas: #1c1f23;
-    --pane: #23272c;
-    --ink: #e6e9ec;
-    --quiet: #a3adb7;
-    --accent: #86b6e0;
-    --accent-ink: #10202e;
-    --rail: #3a4148;
-    --field: #262b31;
-    --signal: #e0a04a;
-    --error: #ff6b61;
-    --error-bg: #3a1f1d;
-    color-scheme: dark;
-  }
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -44,16 +34,17 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 h1, h2, h3 { line-height: 1.25; margin: 0; font-weight: 600; }
-h1 { font-size: 1.6rem; }
+h1 { font-size: 1.6rem; letter-spacing: -0.01em; }
 h2 { font-size: 1.15rem; }
 h3 { font-size: 1rem; }
 p { margin: 0.4rem 0; }
 [hidden] { display: none !important; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+::selection { background: var(--accent-soft); color: var(--ink); }
 h1:focus, main:focus { outline: none; }
 
 /* ── оболочка ── */
-.skip { position: absolute; left: -999px; top: 0; background: var(--canvas); padding: 8px 12px; z-index: 50; }
+.skip { position: absolute; left: -999px; top: 0; background: var(--raise); color: var(--ink); padding: 8px 12px; z-index: 50; }
 .skip:focus { left: 8px; }
 .shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
 .topbar { display: none; }
@@ -71,10 +62,15 @@ h1:focus, main:focus { outline: none; }
   display: flex; justify-content: space-between; align-items: center;
   padding: 8px 10px; border-radius: var(--radius); color: var(--ink); text-decoration: none; min-height: 36px;
 }
-.nav-link:hover { background: var(--rail); }
-.nav-link.active { background: var(--canvas); color: var(--accent); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.nav-link:hover { background: var(--raise); }
+.nav-link.active { background: var(--accent-soft); color: var(--ink); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
 .nav-count { color: var(--quiet); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+.nav-body { display: flex; flex-direction: column; gap: 12px; flex: 1; }
 .nav-foot { margin-top: auto; padding: 0 10px; }
+.capture-slot.side { padding: 0 2px; }
+.capture-slot.side .capture-open { width: 100%; }
+.capture-slot:empty { display: none; }
+.topbar-tools { display: flex; gap: 8px; align-items: center; }
 .scrim { display: none; }
 .content { padding: 28px 40px 80px; max-width: 980px; width: 100%; }
 
@@ -90,17 +86,17 @@ h1:focus, main:focus { outline: none; }
 
 /* ── элементы управления ── */
 button, .button, summary.ghost {
-  font: inherit; color: var(--ink); background: var(--canvas);
-  border: 1px solid #8a99a8; border-radius: var(--radius);
+  font: inherit; color: var(--ink); background: var(--raise);
+  border: 1px solid var(--edge); border-radius: var(--radius);
   padding: 6px 12px; min-height: 34px; cursor: pointer; text-decoration: none;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
-button:hover, .button:hover { border-color: var(--ink); }
+button:hover, .button:hover { border-color: var(--quiet); }
 button:disabled { opacity: 0.55; cursor: default; }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-button.primary:hover { filter: brightness(1.08); }
+button.primary:hover { background: #8cbdf0; border-color: #8cbdf0; }
 button.ghost, summary.ghost { background: transparent; border-color: transparent; color: var(--accent); }
-button.ghost:hover, summary.ghost:hover { border-color: var(--rail); background: var(--field); }
+button.ghost:hover, summary.ghost:hover { border-color: var(--rail); background: var(--raise); }
 button.link { background: none; border: none; padding: 2px 4px; min-height: auto; color: var(--accent); text-decoration: underline; }
 button.danger, .danger { color: var(--error); }
 button.icon { min-width: 34px; padding: 4px 8px; }
@@ -109,10 +105,11 @@ button.pill.active { background: var(--accent); color: var(--accent-ink); border
 
 input[type=text], input[type=search], input[type=password], input[type=date], input[type=time], select, textarea {
   font: inherit; color: var(--ink); background: var(--field);
-  border: 1px solid var(--rail); border-radius: var(--radius); padding: 7px 10px; min-height: 36px; width: 100%;
+  border: 1px solid var(--edge); border-radius: var(--radius); padding: 7px 10px; min-height: 36px; width: 100%;
 }
 textarea { resize: vertical; }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+input::placeholder, textarea::placeholder { color: #7f8d9b; }
 input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
 
 .field { display: flex; flex-direction: column; gap: 4px; }
@@ -120,13 +117,14 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .field-label { font-size: 0.875rem; color: var(--quiet); }
 .field-hint { font-size: 0.8rem; color: var(--quiet); }
 .check-field { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; min-height: 34px; }
-.check-field.signal, .signal-check { color: var(--signal); }
+/* Охра появляется, только когда отметка действительно стоит. */
+.check-field.signal, .signal-check:has(input:checked) { color: var(--signal); }
 .signal-check input { accent-color: var(--signal); }
 .toggle { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
 .toggles { display: flex; gap: 20px; flex-wrap: wrap; color: var(--quiet); }
 .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 4px; }
 .actions.start { justify-content: flex-start; }
-.segmented { display: inline-flex; border: 1px solid var(--rail); border-radius: var(--radius); overflow: hidden; }
+.segmented { display: inline-flex; border: 1px solid var(--edge); border-radius: var(--radius); overflow: hidden; }
 .segmented button { border: none; border-radius: 0; background: transparent; color: var(--ink); min-height: 32px; }
 .segmented button[aria-checked=true], .segmented button[aria-selected=true] { background: var(--accent); color: var(--accent-ink); }
 .quick { display: flex; gap: 6px; margin-top: 2px; }
@@ -143,13 +141,14 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .list.nested { margin-top: 6px; }
 .task-row, .chaos-row, .plain-row {
   display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start;
-  padding: 10px 4px; border-bottom: 1px solid var(--rail);
+  padding: 12px 6px; border-bottom: 1px solid var(--rail);
 }
+.list > li:first-child { border-top: 1px solid var(--rail); }
 .chaos-row, .plain-row { grid-template-columns: 1fr auto; }
 .task-row.closed .task-text { color: var(--quiet); }
 .task-row.closed .task-text { text-decoration: none; }
 .task-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.task-text { overflow-wrap: anywhere; }
+.task-text { overflow-wrap: anywhere; line-height: 1.45; }
 .task-next { color: var(--accent); font-size: 0.9rem; }
 .task-steps-count { color: var(--quiet); font-size: 0.85rem; }
 .task-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.85rem; color: var(--quiet); }
@@ -161,19 +160,19 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
   width: 24px; height: 24px; min-height: 24px; padding: 0; border-radius: 50%;
   border: 1.5px solid var(--quiet); background: transparent; margin-top: 1px; font-size: 0.8rem; color: var(--ink);
 }
-.check:hover { border-color: var(--accent); }
-.check.done { background: var(--rail); border-color: var(--rail); }
+.check:hover { border-color: var(--accent); background: var(--accent-soft); }
+.check.done { background: var(--edge); border-color: var(--edge); }
 
 .menu { position: relative; }
 .menu > summary { list-style: none; }
 .menu > summary::-webkit-details-marker { display: none; }
 .menu-list {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 240px;
-  background: var(--canvas); border: 1px solid var(--rail); border-radius: var(--radius);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12); padding: 6px; display: flex; flex-direction: column; gap: 4px;
+  background: var(--raise); border: 1px solid var(--edge); border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); padding: 6px; display: flex; flex-direction: column; gap: 4px;
 }
 .menu-list > button { justify-content: flex-start; border-color: transparent; }
-.menu-list > button:hover { background: var(--field); }
+.menu-list > button:hover { background: var(--accent-soft); }
 .menu-date { display: flex; gap: 6px; }
 .menu-hint { font-size: 0.8rem; color: var(--quiet); margin: 2px 4px; }
 
@@ -182,13 +181,37 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .urgent-block { margin-bottom: 8px; }
 
 /* ── план ── */
-.day-nav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.day-nav { display: flex; flex-direction: column; gap: 10px; }
 .day-nav input[type=date], .day-nav select { width: auto; max-width: 100%; }
-.day-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.week-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: stretch; }
+.week-row > button.icon { min-height: 100%; font-size: 1.2rem; }
+/* Неделя — семь равных клеток без прокрутки: на 390 px каждая около 40 px. */
+.week { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.week-day {
+  width: 100%; min-height: 58px; padding: 6px 0 8px; flex-direction: column; gap: 2px;
+  background: transparent; border-color: var(--rail); position: relative;
+}
+.week-day .wd { font-size: 0.75rem; color: var(--quiet); line-height: 1.2; }
+.week-day .dn { font-size: 1.2rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.week-day:hover { border-color: var(--edge); background: var(--raise); }
+.week-day.today::after {
+  content: ""; position: absolute; left: 50%; bottom: 5px; width: 16px; height: 2px; margin-left: -8px;
+  border-radius: 1px; background: var(--accent);
+}
+.week-day.selected { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.week-day.selected .wd { color: var(--accent-ink); }
+.week-day.selected.today::after { background: var(--accent-ink); }
+.day-jump { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.date-jump { margin-left: auto; }
+.day-title { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; padding-top: 4px; }
+.day-title h2 { font-size: 1.45rem; letter-spacing: -0.01em; }
+.day-date { color: var(--ink); font-size: 1.02rem; }
+.text-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; margin-left: auto; padding: 4px 2px; }
+.text-link:hover { text-decoration-thickness: 2px; }
 .search { display: flex; flex-direction: column; gap: 6px; }
 .search-toggles { display: flex; gap: 16px; font-size: 0.875rem; color: var(--quiet); }
 .search-head { display: flex; justify-content: space-between; align-items: center; }
-.search-results:not(:empty) { border: 1px solid var(--rail); border-radius: var(--radius); padding: 8px 12px; }
+.search-results:not(:empty) { border: 1px solid var(--edge); border-radius: var(--radius); padding: 8px 12px; }
 
 /* ── обзор: маршрут на вертикальной оси ── */
 .route { list-style: none; margin: 0; padding: 0 0 0 28px; position: relative; }
@@ -200,7 +223,7 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 }
 .route-group.signal .node { background: var(--signal); border-color: var(--signal); }
 .route-group.signal > .group-title { color: var(--signal); }
-.route-group.empty-group .node { background: var(--canvas); border-color: var(--rail); }
+.route-group.empty-group .node { background: var(--canvas); border-color: var(--edge); }
 .route-group.empty-group > .group-title { color: var(--quiet); }
 .route-group > .group-title { font-size: 1.05rem; margin-top: 8px; }
 
@@ -224,7 +247,7 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
   width: 100%; justify-content: flex-start; text-align: left; border-color: transparent; background: transparent;
   padding: 6px 8px; min-height: 32px;
 }
-.folder.active, .note-link.active { background: var(--rail); font-weight: 600; }
+.folder.active, .note-link.active { background: var(--accent-soft); font-weight: 600; }
 .folder-actions { display: flex; gap: 4px; padding-left: 4px; font-size: 0.85rem; }
 .notes-col { display: flex; flex-direction: column; gap: 8px; }
 .note-editor { display: flex; flex-direction: column; gap: 10px; }
@@ -253,12 +276,18 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .report td { text-align: right; }
 .warnings { color: var(--quiet); margin: 0; padding-left: 20px; }
 
+/* ── окно «Записать» ── */
+.capture-form { display: flex; flex-direction: column; gap: 12px; }
+.capture-form input[type=text] { font-size: 1.05rem; min-height: 44px; }
+.capture-open { white-space: nowrap; }
+
 /* ── окна, ошибки, статус ── */
 .modal {
   border: 1px solid var(--rail); border-radius: 12px; padding: 20px; width: min(620px, calc(100vw - 24px));
-  max-height: calc(100vh - 24px); overflow: auto; color: var(--ink); background: var(--canvas);
+  max-height: calc(100vh - 24px); overflow: auto; color: var(--ink); background: var(--pane);
+  border-color: var(--edge); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 }
-.modal::backdrop { background: rgba(20, 30, 40, 0.35); }
+.modal::backdrop { background: rgba(6, 10, 15, 0.66); }
 .modal-title { margin-bottom: 8px; }
 .modal-body { display: flex; flex-direction: column; gap: 12px; }
 .extra { border-top: 1px solid var(--rail); padding-top: 8px; }
@@ -278,7 +307,7 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .error-banner .link { color: var(--error); }
 .status {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(20px); z-index: 90;
-  background: var(--ink); color: var(--canvas); padding: 8px 16px; border-radius: 999px; opacity: 0;
+  background: var(--ink); color: var(--canvas); font-weight: 500; padding: 8px 16px; border-radius: 999px; opacity: 0;
   pointer-events: none; transition: opacity 0.15s, transform 0.15s; max-width: calc(100vw - 24px);
 }
 .status.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -296,13 +325,17 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
     display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 30;
     background: var(--pane); border-bottom: 1px solid var(--rail); padding: 8px 14px; min-height: 52px;
   }
-  .nav-toggle { min-height: 40px; }
+  .nav-toggle, .topbar .capture-open { min-height: 40px; }
+  .date-jump { margin-left: 0; }
+  .week-row { gap: 4px; }
+  .week { gap: 3px; }
+  .week-row > button.icon { min-width: 32px; padding: 4px 6px; }
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; width: min(280px, 85vw); height: auto; z-index: 40;
     transform: translateX(-105%); transition: transform 0.15s; visibility: hidden;
   }
   .nav-open .sidebar { transform: none; visibility: visible; }
-  .nav-open .scrim { display: block; position: fixed; inset: 0; background: rgba(20, 30, 40, 0.35); z-index: 35; }
+  .nav-open .scrim { display: block; position: fixed; inset: 0; background: rgba(6, 10, 15, 0.66); z-index: 35; }
   .nav-link { min-height: 44px; }
   .content { padding: 18px 14px 80px; }
   .notes-layout { grid-template-columns: 1fr; }

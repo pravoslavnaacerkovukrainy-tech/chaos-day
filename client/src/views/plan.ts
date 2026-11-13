@@ -1,7 +1,7 @@
 // «План»: «Сегодня» или любой выбранный день. Выборку делает сервер (GET /api/day).
 import { api } from "../api.ts";
 import { app, areaMatches, snap, taskOrder } from "../app.ts";
-import { addDays, dayLabel, isDayKey, shortDate, weekday } from "../dates.ts";
+import { addDays, dayLabel, dayOfMonth, isDayKey, relativeName, shortDate, weekday, weekdayShort, weekOf } from "../dates.ts";
 import { button, h, setChildren } from "../dom.ts";
 import { openTaskEditor, taskRow } from "../task.ts";
 import type { DayKey, Task } from "../types.ts";
@@ -59,18 +59,43 @@ export function planView(): HTMLElement {
     });
   }
 
+  // Все семь клеток недели носят один testid: после перерисовки фокус ставим на выбранную.
+  const pickFromWeek = (d: DayKey) => {
+    setDay(d);
+    document.querySelector<HTMLElement>(`[data-testid="plan-week-day"][data-day="${d}"]`)?.focus();
+  };
+  const week = h("ul", { class: "week", testid: "plan-week", "aria-label": "Неделя" },
+    weekOf(day).map((d) => {
+      const selected = d === day;
+      const label = `${weekday(d)}, ${shortDate(d, t)}${d === t ? ", сегодня" : ""}`;
+      return h("li", null, h("button", {
+        type: "button", onclick: () => pickFromWeek(d),
+        class: "week-day" + (selected ? " selected" : "") + (d === t ? " today" : ""),
+        testid: "plan-week-day", "data-day": d, "aria-pressed": String(selected),
+        "aria-current": d === t ? "date" : undefined, "aria-label": label,
+      },
+        h("span", { class: "wd", "aria-hidden": "true" }, weekdayShort(d)),
+        h("span", { class: "dn", "aria-hidden": "true" }, String(dayOfMonth(d)))));
+    }));
+  const tomorrow = addDays(t, 1);
+  const fullDate = shortDate(day, t) + ", " + weekday(day);
+
   return h("section", { class: "view", "aria-labelledby": "view-title" },
     header("План", "view-plan", areaFilter()),
     searchBox(),
     h("nav", { class: "day-nav", "aria-label": "Выбор дня" },
-      button("‹", () => setDay(addDays(day, -1)), { class: "ghost icon", "aria-label": "Предыдущий день", testid: "plan-prev" }),
-      button("Сегодня", () => setDay(t), { class: isToday ? "pill active" : "pill", "aria-pressed": String(isToday), testid: "plan-today" }),
-      button("Завтра", () => setDay(addDays(t, 1)), { class: day === addDays(t, 1) ? "pill active" : "pill", "aria-pressed": String(day === addDays(t, 1)), testid: "plan-tomorrow" }),
-      button("›", () => setDay(addDays(day, 1)), { class: "ghost icon", "aria-label": "Следующий день", testid: "plan-next" }),
-      picker),
+      h("div", { class: "week-row" },
+        button("‹", () => setDay(addDays(day, -1)), { class: "ghost icon", "aria-label": "Предыдущий день", testid: "plan-prev" }),
+        week,
+        button("›", () => setDay(addDays(day, 1)), { class: "ghost icon", "aria-label": "Следующий день", testid: "plan-next" })),
+      h("div", { class: "day-jump" },
+        button("Сегодня", () => setDay(t), { class: isToday ? "pill active" : "pill", "aria-pressed": String(isToday), testid: "plan-today" }),
+        button("Завтра", () => setDay(tomorrow), { class: day === tomorrow ? "pill active" : "pill", "aria-pressed": String(day === tomorrow), testid: "plan-tomorrow" }),
+        h("label", { class: "inline-field date-jump" }, h("span", { class: "quiet small" }, "Дата"), picker))),
     h("div", { class: "day-title" },
       h("h2", { testid: "plan-day-title" }, dayLabel(day, t)),
-      h("span", { class: "quiet" }, isToday ? shortDate(day, t) + ", " + weekday(day) : weekday(day))),
+      relativeName(day, t) ? h("span", { class: "day-date" }, fullDate) : h("span", { class: "day-date" }, weekday(day)),
+      isToday ? h("a", { href: "#/review", class: "text-link", testid: "plan-review-link" }, "Пересмотреть план") : null),
     h("p", { class: "quiet small" }, isToday
       ? "День работы, незавершённое с прошлых дней, наступивший срок и обещания под угрозой."
       : "Открытые задачи с днём работы или сроком результата на эту дату."),

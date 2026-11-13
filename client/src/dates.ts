@@ -25,9 +25,30 @@ const MONTHS = ["января", "февраля", "марта", "апреля", 
   "сентября", "октября", "ноября", "декабря"];
 const WEEKDAYS = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
 
-export function weekday(key: DayKey): string {
+const WEEKDAYS_SHORT = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+function dayIndex(key: DayKey): number {
   const [y, m, d] = parts(key);
-  return WEEKDAYS[new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()] ?? "";
+  return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+}
+
+export function weekday(key: DayKey): string {
+  return WEEKDAYS[dayIndex(key)] ?? "";
+}
+
+export function weekdayShort(key: DayKey): string {
+  return WEEKDAYS_SHORT[dayIndex(key)] ?? "";
+}
+
+/** Число месяца без ведущего нуля. */
+export function dayOfMonth(key: DayKey): number {
+  return parts(key)[2];
+}
+
+/** Семь календарных дней недели, содержащей день: с понедельника по воскресенье. */
+export function weekOf(key: DayKey): DayKey[] {
+  const monday = addDays(key, -((dayIndex(key) + 6) % 7));
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 }
 
 /** «13 ноября» или «13 ноября 2027», если год другой. */

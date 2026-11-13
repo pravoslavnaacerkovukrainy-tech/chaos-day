@@ -1,6 +1,7 @@
 // «Место хаоса»: одна строка, решение позже.
 import { api } from "../api.ts";
 import { run, snap } from "../app.ts";
+import { captureLine } from "../capture.ts";
 import { button, h } from "../dom.ts";
 import { openTaskEditor } from "../task.ts";
 import type { ChaosItem } from "../types.ts";
@@ -17,18 +18,10 @@ export function chaosView(): HTMLElement {
   const urgent = h("input", { type: "checkbox", testid: "chaos-urgent-input" });
 
   const save = async () => {
-    const text = input.value.trim();
-    if (!text) {
-      input.focus();
-      return;
-    }
     // Черновик стирается только после успешной записи и до перерисовки; при ошибке он остаётся в поле.
-    const ok = await run(async () => {
-      const result = await api.addChaos(text, urgent.checked);
-      clearDraft(DRAFT);
-      return result;
-    }, "Записано в место хаоса");
-    if (ok) document.querySelector<HTMLInputElement>('[data-testid="chaos-input"]')?.focus();
+    const result = await captureLine(input.value, urgent.checked, { onSaved: () => clearDraft(DRAFT) });
+    if (result === "empty") input.focus();
+    else if (result === "saved") document.querySelector<HTMLInputElement>('[data-testid="chaos-input"]')?.focus();
   };
   input.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.isComposing) {

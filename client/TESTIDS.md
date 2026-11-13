@@ -18,6 +18,17 @@
 | `area-filter`, `area-all`, `area-work`, `area-personal` | Фильтр «Все / Работа / Личное» |
 | `empty` и `*-empty` | Пустой раздел; текст содержит «Сейчас здесь ничего нет» |
 | `view-chaos`, `view-plan`, `view-projects`, `view-waiting`, `view-review`, `view-tasks`, `view-notes`, `view-diary`, `view-data` | Заголовок `h1` раздела |
+| `capture-open` | Постоянная кнопка «Записать»: в боковой панели на широком окне, в верхней строке на узком (≤ 860 px). Одна на страницу |
+
+## Окно «Записать» (`capture-dialog`, `<dialog>`)
+
+Открывается из любого раздела, раздел не меняется. Строка уходит в «Место хаоса».
+
+| testid | |
+|---|---|
+| `capture-input`, `capture-urgent-input` | Строка (фокус при открытии, Enter записывает), необязательная отметка «Не может ждать» |
+| `capture-save`, `capture-cancel` | «Записать», «Отмена» (и Esc) — без записи. После закрытия фокус возвращается на кнопку, открывшую окно |
+| `capture-dialog-error` | Ошибка записи внутри окна; введённая строка остаётся |
 
 ## Вход
 
@@ -70,6 +81,9 @@
 
 `plan-today`, `plan-tomorrow`, `plan-prev`, `plan-next`, `plan-date`, `plan-day-title`, `plan-list`, `plan-empty`,
 `plan-new-task`, `plan-urgent` / `plan-urgent-item` / `plan-urgent-to-task` (строки «Не может ждать» в «Сегодня»).
+Неделя `plan-week`: семь кнопок `plan-week-day` с понедельника по воскресенье, у каждой `data-day="YYYY-MM-DD"`,
+выбранная с `aria-pressed="true"`, сегодняшняя с `aria-current="date"`. `plan-review-link` — «Пересмотреть план»
+в «Сегодня», ведёт на `#/review`.
 Поиск по делам: `deals-search`, `deals-search-results`, `deals-search-count`, `deals-search-clear`,
 `deals-search-completed`, `deals-search-removed`, `search-project`, `search-chaos`.
 

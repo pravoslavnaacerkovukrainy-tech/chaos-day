@@ -64,8 +64,11 @@ export async function refresh(): Promise<void> {
 /**
  * Выполнить изменение. Успех — подтверждение и свежий снимок. Ошибка — красная строка,
  * данные на экране остаются прежними (сервер откатывает изменение целиком).
+ * `onError` показывает ошибку в другом месте, например внутри открытого окна.
  */
-export async function run<T>(action: () => Promise<T>, success?: string): Promise<T | undefined> {
+export async function run<T>(
+  action: () => Promise<T>, success?: string, onError: (err: unknown) => void = showError,
+): Promise<T | undefined> {
   try {
     const result = await action();
     app.version++;
@@ -74,7 +77,7 @@ export async function run<T>(action: () => Promise<T>, success?: string): Promis
     await refresh();
     return result;
   } catch (err) {
-    showError(err);
+    onError(err);
     return undefined;
   }
 }

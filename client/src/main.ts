@@ -1,6 +1,7 @@
 // Точка входа: вход, оболочка с перечнем разделов, маршрутизация по #/раздел.
 import { api, ApiError, setUnauthorizedHandler } from "./api.ts";
 import { app, loadSnapshot, ROUTES, type Route } from "./app.ts";
+import { openCapture } from "./capture.ts";
 import { button, clear, field, h } from "./dom.ts";
 import { errorText, hideError, mountChrome, say } from "./ui.ts";
 import { chaosView } from "./views/chaos.ts";
@@ -27,6 +28,10 @@ let main: HTMLElement | null = null;
 let navEl: HTMLElement | null = null;
 let shellEl: HTMLElement | null = null;
 let lastRoute: Route | null = null;
+let navBody: HTMLElement | null = null;
+/** Граница узкого окна совпадает с @media (max-width: 860px) в styles.css. */
+const narrow = window.matchMedia("(max-width: 860px)");
+let placeCapture: (() => void) | null = null;
 
 // ───────────────────────── вход ─────────────────────────
 
@@ -34,6 +39,7 @@ async function showLogin(): Promise<void> {
   app.snapshot = null;
   shellEl = null;
   main = null;
+  navBody = null;
   clear(root);
   document.querySelectorAll("dialog").forEach((d) => d.remove());
   let setup = false;
@@ -109,9 +115,27 @@ function buildShell(): void {
     }
   });
   main = h("main", { id: "main", class: "content", tabindex: -1 });
+
+  // Одна кнопка «Записать» на всё приложение: в боковой панели на широком окне, в верхней строке на узком.
+  const capture = button("Записать", (ev) => openCapture(ev.currentTarget as HTMLElement), {
+    class: "primary capture-open", testid: "capture-open", "aria-haspopup": "dialog",
+    title: "Записать строку в место хаоса",
+  });
+  const sideSlot = h("div", { class: "capture-slot side" });
+  const topSlot = h("div", { class: "capture-slot top" });
+  navBody = h("div", { class: "nav-body" });
+  navEl.append(h("div", { class: "brand side-brand" }, "Хаос Дня"), sideSlot, navBody);
+  if (placeCapture) narrow.removeEventListener("change", placeCapture);
+  placeCapture = () => {
+    const slot = narrow.matches ? topSlot : sideSlot;
+    if (capture.parentElement !== slot) slot.append(capture);
+  };
+  narrow.addEventListener("change", placeCapture);
+  placeCapture();
+
   shellEl = h("div", { class: "shell" },
     h("a", { class: "skip", href: "#main", onclick: (ev: Event) => { ev.preventDefault(); main?.focus(); } }, "К содержимому"),
-    h("header", { class: "topbar" }, h("span", { class: "brand" }, "Хаос Дня"), toggle),
+    h("header", { class: "topbar" }, h("span", { class: "brand" }, "Хаос Дня"), h("div", { class: "topbar-tools" }, topSlot, toggle)),
     navEl,
     h("div", { class: "scrim", "aria-hidden": "true", onclick: closeNav }),
     main);
@@ -120,11 +144,10 @@ function buildShell(): void {
 }
 
 function renderNav(route: Route): void {
-  if (!navEl || !app.snapshot) return;
+  if (!navBody || !app.snapshot) return;
   const s = app.snapshot;
   const counts: Partial<Record<Route, number>> = { chaos: s.chaos.length };
-  navEl.replaceChildren(
-    h("div", { class: "brand side-brand" }, "Хаос Дня"),
+  navBody.replaceChildren(
     h("ul", { class: "nav-list" }, ROUTES.map((r) => h("li", null,
       h("a", { href: "#/" + r.id, class: "nav-link" + (r.id === route ? " active" : ""), "aria-current": r.id === route ? "page" : undefined, testid: "nav-" + r.id },
         h("span", null, r.title),

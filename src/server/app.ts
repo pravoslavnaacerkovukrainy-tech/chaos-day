@@ -339,7 +339,11 @@ function buildRoutes(options: AppOptions): Route[] {
     }),
     route('PATCH', '/tasks/:id', async (ctx) => {
       const body = await ctx.json();
-      sendOk(ctx.res, { task: store.updateTask(requireParam(ctx, 'id'), taskDraftFrom(body)) });
+      sendOk(ctx.res, {
+        task: store.updateTask(requireParam(ctx, 'id'), taskDraftFrom(body), {
+          revision: body.base_revision,
+        }),
+      });
     }),
     route('POST', '/tasks/:id/reschedule', async (ctx) => {
       const body = await ctx.json();

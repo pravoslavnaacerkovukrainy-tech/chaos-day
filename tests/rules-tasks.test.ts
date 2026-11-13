@@ -391,3 +391,160 @@ describe('Проверка текста', () => {
     assert.equal(task.details, null);
   });
 });
+
+describe('Счётчик правок и base_revision', () => {
+  it('правка со свежим основанием проходит и возвращает новый счётчик', () => {
+    const { store } = createTestStore();
+    const task = store.createTask({ text: 'Согласовать отчёт', day: '2026-11-13' });
+    assert.equal(task.revision, 0);
+
+    const saved = store.updateTask(
+      task.id,
+      { text: 'Согласовать отчёт с Ольгой' },
+      { revision: task.revision },
+    );
+
+    assert.equal(saved.text, 'Согласовать отчёт с Ольгой');
+    assert.equal(saved.revision, 1);
+    assert.equal(store.getTask(task.id).revision, 1);
+  });
+
+  it('без основания правка проходит прежним порядком', () => {
+    const { store } = createTestStore();
+    const task = store.createTask({ text: 'Дело' });
+
+    const first = store.updateTask(task.id, { details: 'Первая' });
+    const second = store.updateTask(task.id, { details: 'Вторая' }, {});
+    const third = store.updateTask(task.id, { details: 'Третья' }, { revision: null });
+    const fourth = store.updateTask(task.id, { details: 'Четвёртая' }, { revision: undefined });
+
+    assert.equal(fourth.details, 'Четвёртая');
+    assert.equal(fourth.revision, first.revision + 3);
+    assert.equal(second.revision, first.revision + 1);
+    assert.equal(third.revision, first.revision + 2);
+    assert.equal(store.getTask(task.id).revision, task.revision + 4);
+  });
+
+  it('устаревший редактор не затирает правку Mac', () => {
+    const { store } = createTestStore();
+    const task = store.createTask({ text: 'Согласовать отчёт', day: '2026-11-13' });
+    const openedInBrowser = task.revision;
+
+    const fromMac = store.syncTask(task.id, { day: '2026-11-13' }, { day: '2026-11-16' });
+    assert.deepEqual(fromMac.conflicts, []);
+
+    throwsCode(
+      () =>
+        store.updateTask(
+          task.id,
+          { text: 'Черновик браузера', day: '2026-11-14' },
+          { revision: openedInBrowser },
+        ),
+      'conflicting_changes',
+    );
+
+    const kept = store.getTask(task.id);
+    assert.equal(kept.text, 'Согласовать отчёт', 'черновик не применён');
+    assert.equal(kept.day, '2026-11-16', 'день из Mac сохранён');
+    assert.equal(kept.revision, fromMac.task.revision, 'отказ не пишет в базу');
+
+    // Перезагрузив редактор, человек видит свежий счётчик и сохраняет черновик.
+    const retried = store.updateTask(
+      task.id,
+      { text: 'Черновик браузера' },
+      { revision: kept.revision },
+    );
+    assert.equal(retried.text, 'Черновик браузера');
+    assert.equal(retried.day, '2026-11-16', 'правка Mac не потеряна');
+    assert.equal(retried.revision, kept.revision + 1);
+  });
+
+  it('основание сравнивается с текущим счётчиком, а не с черновиком', () => {
+    const { store } = createTestStore();
+    const task = store.createTask({ text: 'Дело' });
+    store.updateTask(task.id, { details: 'Правка из другого окна' });
+
+    throwsCode(
+      () => store.updateTask(task.id, { details: 'Мой черновик' }, { revision: task.revision }),
+      'conflicting_changes',
+    );
+    assert.equal(store.getTask(task.id).details, 'Правка из другого окна');
+
+    const fresh = store.updateTask(
+      task.id,
+      { details: 'Мой черновик' },
+      { revision: task.revision + 1 },
+    );
+    assert.equal(fresh.details, 'Мой черновик');
+  });
+
+  it('неверное основание отклоняется раньше, чем поиск задачи', () => {
+    const { store } = createTestStore();
+    const task = store.createTask({ text: 'Дело' });
+
+    for (const bad of ['1', 1.5, -1, true, {}, []]) {
+      throwsCode(
+        () => store.updateTask(task.id, { details: 'Правка' }, { revision: bad }),
+        'invalid_request',
+        String(bad),
+      );
+    }
+    throwsCode(
+      () =>
+        store.updateTask(
+          'a1000000-0000-4000-8000-0000000000bb',
+          { details: 'Правка' },
+          { revision: 'не число' },
+        ),
+      'invalid_request',
+      'проверка формы раньше 404',
+    );
+    throwsCode(
+      () =>
+        store.updateTask(
+          'a1000000-0000-4000-8000-0000000000bb',
+          { details: 'Правка' },
+          { revision: 0 },
+        ),
+      'not_found',
+    );
+
+    assert.equal(store.getTask(task.id).revision, task.revision, 'задача не изменена');
+  });
+
+  it('состояние задачи важнее устаревшего основания', () => {
+    const { store } = createTestStore();
+    const done = store.createTask({ text: 'Выполненная' });
+    store.completeTask(done.id);
+    throwsCode(
+      () => store.updateTask(done.id, { text: 'Другое' }, { revision: 99 }),
+      'task_is_completed',
+    );
+
+    const removed = store.createTask({ text: 'Снятая' });
+    store.removeTask(removed.id, 'Пока не нужно');
+    throwsCode(
+      () => store.updateTask(removed.id, { text: 'Другое' }, { revision: 0 }),
+      'task_is_removed',
+    );
+  });
+
+  it('правка с основанием не трогает шаги', () => {
+    const { store } = createTestStore();
+    const task = store.createTask({ text: 'Собрать документы' });
+    store.replaceTaskSteps(task.id, [{ text: 'Первый шаг' }], task.updated_at);
+    const withSteps = store.getTask(task.id);
+
+    const saved = store.updateTask(
+      task.id,
+      { text: 'Собрать документы и справку' },
+      { revision: withSteps.revision },
+    );
+
+    assert.deepEqual(
+      saved.steps.map((step) => step.text),
+      ['Первый шаг'],
+    );
+    assert.equal(saved.revision, withSteps.revision + 1);
+  });
+});

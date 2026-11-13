@@ -529,3 +529,118 @@ describe('HTTP: синхронизация задачи', () => {
     assert.equal(after.body.data.task.revision, task.revision, 'задача не изменена');
   });
 });
+
+describe('HTTP: условие base_revision в PATCH /api/tasks/:id', () => {
+  it('без сессии правка закрыта', async () => {
+    const task = await createTask({ text: 'Согласовать график', day: '2026-11-14' });
+
+    const res = await api(`/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      body: { text: 'Черновик', base_revision: task.revision },
+      withCookie: false,
+    });
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error.code, 'unauthorized');
+
+    const still = await api(`/api/tasks/${task.id}`);
+    assert.equal(still.body.data.task.text, 'Согласовать график');
+  });
+
+  it('устаревшая ревизия даёт 409 conflicting_changes и не меняет задачу', async () => {
+    const task = await createTask({ text: 'Согласовать график', day: '2026-11-14' });
+    const fromMac = await api(`/api/sync/tasks/${task.id}`, {
+      method: 'POST',
+      body: { base: { day: '2026-11-14' }, changes: { day: '2026-11-16' } },
+    });
+    assert.equal(fromMac.status, 200);
+
+    const stale = await api(`/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      body: { text: 'Черновик браузера', base_revision: task.revision },
+    });
+
+    assert.equal(stale.status, 409);
+    assert.equal(stale.body.ok, undefined);
+    assert.equal(stale.body.error.code, 'conflicting_changes');
+    assert.ok(stale.body.error.message.length > 0);
+    assert.equal(stale.body.data, undefined, 'в отказе нет данных задачи');
+
+    const current = await api(`/api/tasks/${task.id}`);
+    assert.equal(current.body.data.task.text, 'Согласовать график', 'черновик не применён');
+    assert.equal(current.body.data.task.day, '2026-11-16', 'правка Mac сохранена');
+    assert.equal(current.body.data.task.revision, fromMac.body.data.task.revision);
+  });
+
+  it('свежая ревизия проходит и возвращает задачу с новым счётчиком', async () => {
+    const task = await createTask({ text: 'Согласовать график', day: '2026-11-14' });
+
+    const res = await api(`/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      body: { text: 'Согласовать график с Ольгой', base_revision: task.revision },
+    });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(Object.keys(res.body.data), ['task']);
+    assert.equal(res.body.data.task.text, 'Согласовать график с Ольгой');
+    assert.equal(res.body.data.task.revision, task.revision + 1);
+    assert.equal(res.body.data.task.day, '2026-11-14');
+
+    // То же основание уже устарело: второй редактор получает отказ.
+    const again = await api(`/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      body: { text: 'Черновик второго окна', base_revision: task.revision },
+    });
+    assert.equal(again.status, 409);
+    assert.equal(again.body.error.code, 'conflicting_changes');
+  });
+
+  it('без base_revision прежнее поведение сохраняется', async () => {
+    const task = await createTask({ text: 'Согласовать график' });
+
+    const plain = await api(`/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      body: { text: 'Правка без условия' },
+    });
+    assert.equal(plain.status, 200);
+    assert.equal(plain.body.data.task.revision, task.revision + 1);
+
+    for (const revision of [null, '']) {
+      const res = await api(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        body: { details: `Подробности ${revision === null ? 'null' : 'пусто'}`, base_revision: revision },
+      });
+      assert.equal(res.status, 200, JSON.stringify(revision));
+    }
+  });
+
+  it('неверный base_revision отклоняется', async () => {
+    const task = await createTask({ text: 'Согласовать график' });
+
+    for (const revision of ['1', -1, 1.5, true, {}, []]) {
+      const res = await api(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        body: { details: 'Подробности', base_revision: revision },
+      });
+      assert.equal(res.status, 400, JSON.stringify(revision));
+      assert.equal(res.body.error.code, 'invalid_request');
+    }
+
+    const after = await api(`/api/tasks/${task.id}`);
+    assert.equal(after.body.data.task.revision, task.revision, 'задача не изменена');
+    assert.equal(after.body.data.task.details, null);
+  });
+
+  it('удалённая задача даёт 404 и со свежим основанием', async () => {
+    const task = await createTask({ text: 'Согласовать график' });
+    const removed = await api(`/api/tasks/${task.id}`, { method: 'DELETE' });
+    assert.equal(removed.status, 200);
+
+    const res = await api(`/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      body: { text: 'Правка', base_revision: task.revision },
+    });
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error.code, 'not_found');
+  });
+});

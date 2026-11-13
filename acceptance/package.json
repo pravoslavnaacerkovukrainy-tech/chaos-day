@@ -1,0 +1,17 @@
+{
+  "name": "chaos-day-acceptance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:list": "playwright test --list",
+    "test:chrome": "playwright test --project=chrome",
+    "test:firefox": "playwright test --project=firefox",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.10.0",
+    "typescript": "5.9.3"
+  }
+}

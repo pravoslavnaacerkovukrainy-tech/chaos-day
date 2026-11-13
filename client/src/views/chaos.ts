@@ -22,11 +22,13 @@ export function chaosView(): HTMLElement {
       input.focus();
       return;
     }
-    const ok = await run(() => api.addChaos(text, urgent.checked), "Записано в место хаоса");
-    if (ok) {
+    // Черновик стирается только после успешной записи и до перерисовки; при ошибке он остаётся в поле.
+    const ok = await run(async () => {
+      const result = await api.addChaos(text, urgent.checked);
       clearDraft(DRAFT);
-      document.querySelector<HTMLInputElement>('[data-testid="chaos-input"]')?.focus();
-    }
+      return result;
+    }, "Записано в место хаоса");
+    if (ok) document.querySelector<HTMLInputElement>('[data-testid="chaos-input"]')?.focus();
   };
   input.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.isComposing) {

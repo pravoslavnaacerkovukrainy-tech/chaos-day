@@ -22,7 +22,8 @@ export function taskRow(task: Task, opts: RowOptions = {}): HTMLLIElement {
   if (task.at_risk && task.is_open) meta.push(badge("Обещание под угрозой", "signal", "task-at-risk"));
   if (task.is_removed) meta.push(badge("Снято", "", "task-removed"));
   if (task.is_completed) meta.push(badge("Выполнено", "", "task-completed"));
-  if (!task.is_removed && !task.is_completed && task.status !== "ready") meta.push(badge(STATUS_TITLES[task.status] ?? ""));
+  const waitingShown = task.status === "waiting" && Boolean(task.waiting_for);
+  if (!task.is_removed && !task.is_completed && task.status !== "ready" && !waitingShown) meta.push(badge(STATUS_TITLES[task.status] ?? ""));
   const project = projectById(task.project_id);
   if (project) meta.push(badge("Проект: " + project.title));
   if (task.day) meta.push(badge("День работы · " + dayLabel(task.day, t), task.day < t && task.is_open ? "overdue" : "", "task-day"));

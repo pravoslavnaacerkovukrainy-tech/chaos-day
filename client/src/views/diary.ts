@@ -31,11 +31,12 @@ export function diaryView(): HTMLElement {
       return;
     }
     const stamp = time.value ? zonedToIso(day, time.value, s.timezone) : day !== t ? zonedToIso(day, "12:00", s.timezone) : undefined;
-    const ok = await run(() => api.addEntry(value, context.value.trim() || null, stamp), "Записано в дневник");
-    if (ok) {
+    await run(async () => {
+      const result = await api.addEntry(value, context.value.trim() || null, stamp);
       clearDraft("diary-text");
       clearDraft("diary-context");
-    }
+      return result;
+    }, "Записано в дневник");
   };
   text.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey || !ev.shiftKey) && !ev.isComposing) {

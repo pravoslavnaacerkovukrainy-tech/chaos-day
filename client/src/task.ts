@@ -187,7 +187,7 @@ export function openRemoveDialog(task: Task): void {
   reason.addEventListener("input", () => (submit.disabled = reason.value.trim() === ""));
   modal.body.append(
     h("p", { class: "quiet" }, task.text),
-    field("Причина", reason, "Снятие не считается выполнением: запись в дневнике не создаётся, шаги сохраняются."),
+    field("Причина снятия", reason, "Снятие не считается выполнением: запись в дневнике не создаётся, шаги сохраняются."),
     h("div", { class: "actions" }, button("Отмена", () => modal.close(), { testid: "remove-cancel" }), submit),
   );
   reason.focus();
@@ -281,7 +281,7 @@ export function openTaskEditor(opts: EditorOptions): void {
     h("div", { class: "dates" },
       field("Срок результата", deadline),
       field("Дата пересмотра", review)),
-    field("Ожидаю", waiting),
+    field("Кого или чего ждать", waiting),
     field("Кому обещано", promised, "Свободная строка, не контакт. В дневник не копируется."),
     h("label", { class: "check-field" + (atRisk.checked ? " signal" : "") }, atRisk,
       h("span", null, "Обещание под угрозой")),

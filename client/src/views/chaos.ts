@@ -12,7 +12,7 @@ export function chaosView(): HTMLElement {
   const s = snap();
   const input = draftInput(DRAFT, h("input", {
     type: "text", testid: "chaos-input", placeholder: "Задача, заметка или идея",
-    "aria-label": "Быстрая запись в место хаоса", autocomplete: "off",
+    "aria-label": "Новая строка", autocomplete: "off",
   })) as HTMLInputElement;
   const urgent = h("input", { type: "checkbox", testid: "chaos-urgent-input" });
 

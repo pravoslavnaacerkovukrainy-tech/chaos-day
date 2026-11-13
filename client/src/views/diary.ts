@@ -17,7 +17,7 @@ export function diaryView(): HTMLElement {
   };
 
   const text = draftInput("diary-text", h("textarea", {
-    rows: 2, testid: "diary-input", placeholder: "Что сделано или произошло?", "aria-label": "Новая запись в дневник",
+    rows: 2, testid: "diary-input", placeholder: "Что сделано или произошло?", "aria-label": "Что сделано или произошло?",
   })) as HTMLTextAreaElement;
   const context = draftInput("diary-context", h("input", {
     type: "text", testid: "diary-context-input", placeholder: "На чём остановился — чтобы потом продолжить",

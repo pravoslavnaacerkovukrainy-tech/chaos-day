@@ -128,7 +128,7 @@ function renderNav(route: Route): void {
     h("ul", { class: "nav-list" }, ROUTES.map((r) => h("li", null,
       h("a", { href: "#/" + r.id, class: "nav-link" + (r.id === route ? " active" : ""), "aria-current": r.id === route ? "page" : undefined, testid: "nav-" + r.id },
         h("span", null, r.title),
-        counts[r.id] ? h("span", { class: "nav-count", "aria-label": `строк: ${counts[r.id]}` }, String(counts[r.id])) : null)))),
+        counts[r.id] ? h("span", { class: "nav-count", "aria-hidden": "true" }, String(counts[r.id])) : null)))),
     h("div", { class: "nav-foot" },
       button("Выйти", async () => {
         try {

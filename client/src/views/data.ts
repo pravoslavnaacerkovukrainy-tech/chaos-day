@@ -16,7 +16,7 @@ const GROUPS: [keyof ImportReport["added"], string][] = [
 
 export function dataView(): HTMLElement {
   const s = snap();
-  const file = h("input", { type: "file", accept: ".json,application/json", testid: "import-file", "aria-label": "Файл Архив.json или entries.json" });
+  const file = h("input", { type: "file", accept: ".json,application/json", testid: "import-file", "aria-label": "Архив.json или entries.json" });
   const overwrite = h("input", { type: "checkbox", testid: "import-overwrite" });
   const result = h("div", { class: "import-result", "aria-live": "polite", testid: "import-result" });
   const submit = button("Импортировать", async () => {

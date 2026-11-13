@@ -1,0 +1,22 @@
+{
+  "name": "chaos-day",
+  "version": "1.0.0",
+  "private": true,
+  "description": "«Хаос Дня»: веб-версия одного дня. Сервер, хранилище SQLite и правила методики.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node src/server/index.ts",
+    "start": "node src/server/index.ts",
+    "test": "node --test tests/",
+    "typecheck": "tsc --noEmit",
+    "build": "vite build client"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.0"
+  }
+}

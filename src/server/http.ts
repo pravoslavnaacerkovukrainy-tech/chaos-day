@@ -24,6 +24,17 @@ export function sendError(res: ServerResponse, status: number, code: string, mes
   sendJson(res, status, { error: { code, message } });
 }
 
+/** Ошибка с данными: клиенту нужно не только сообщение, но и текущее состояние объекта. */
+export function sendErrorData(
+  res: ServerResponse,
+  status: number,
+  code: string,
+  message: string,
+  data: unknown,
+): void {
+  sendJson(res, status, { error: { code, message }, data });
+}
+
 export function sendFromError(res: ServerResponse, error: unknown): void {
   if (error instanceof ApiError) {
     sendError(res, error.status, error.code, error.message);

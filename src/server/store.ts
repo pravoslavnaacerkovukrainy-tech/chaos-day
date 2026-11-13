@@ -222,6 +222,87 @@ function checkSteps(input: unknown): TaskStep[] {
 }
 
 /* ------------------------------------------------------------------ */
+/* Синхронизация отдельных полей                                        */
+/* ------------------------------------------------------------------ */
+
+/** Поля задачи, которые клиент синхронизирует по отдельности. */
+export const SYNC_TASK_FIELDS = ['day', 'text', 'details'] as const;
+
+export type SyncTaskField = (typeof SYNC_TASK_FIELDS)[number];
+
+/** Значения полей в том виде, в каком они хранятся: день работы — текст, пустой при отсутствии дня. */
+export type SyncTaskValues = Record<SyncTaskField, string | null>;
+
+export interface SyncTaskResult {
+  task: Task;
+  /** Поля, где значение сервера не совпало ни с базой клиента, ни с его правкой. */
+  conflicts: SyncTaskField[];
+}
+
+function checkSyncPatch(value: unknown, what: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ApiError(400, 'invalid_request', `${what}: ожидался объект полей задачи.`);
+  }
+  const patch = value as Record<string, unknown>;
+  const keys = Object.keys(patch);
+  if (keys.length === 0) {
+    throw new ApiError(
+      400,
+      'invalid_request',
+      `${what}: нужно хотя бы одно поле (${SYNC_TASK_FIELDS.join(', ')}).`,
+    );
+  }
+  for (const key of keys) {
+    if (!(SYNC_TASK_FIELDS as readonly string[]).includes(key)) {
+      throw new ApiError(400, 'invalid_request', `${what}: поле «${key}» не синхронизируется.`);
+    }
+  }
+  return patch;
+}
+
+/**
+ * База и правка описывают один и тот же набор полей. Иначе клиент подтверждал бы
+ * изменение, о котором ничего не знает, и молча затирал чужую правку.
+ */
+function syncFields(
+  base: Record<string, unknown>,
+  changes: Record<string, unknown>,
+): SyncTaskField[] {
+  const fields = SYNC_TASK_FIELDS.filter((field) => field in base);
+  const sameSet =
+    fields.length === Object.keys(changes).length && fields.every((field) => field in changes);
+  if (!sameSet) {
+    throw new ApiError(
+      400,
+      'invalid_request',
+      'base и changes должны содержать одинаковый непустой набор полей.',
+    );
+  }
+  return fields;
+}
+
+function normalizeSyncValues(
+  patch: Record<string, unknown>,
+  fields: readonly SyncTaskField[],
+  what: string,
+): SyncTaskValues {
+  const values: SyncTaskValues = { day: null, text: null, details: null };
+  for (const field of fields) {
+    const raw = patch[field];
+    if (field === 'day') values.day = workDayKey(raw, `День работы (${what})`);
+    else if (field === 'text') values.text = cleanText(raw, `Текст задачи (${what})`);
+    else values.details = optionalText(raw, `Подробности (${what})`);
+  }
+  return values;
+}
+
+function syncValueOf(task: Task, field: SyncTaskField): string | null {
+  if (field === 'day') return task.day;
+  if (field === 'text') return task.text;
+  return task.details;
+}
+
+/* ------------------------------------------------------------------ */
 /* Внутреннее представление задачи                                     */
 /* ------------------------------------------------------------------ */
 
@@ -750,6 +831,46 @@ export class Store {
       const next = this.resolveTaskFields(draft, this.taskToValues(this.mapTask(row)), now);
       this.updateTaskValues(next);
       return this.getTask(taskId);
+    });
+  }
+
+  /**
+   * Синхронизация отдельных полей: правка проходит, только если сервер всё ещё держит
+   * значение из базы клиента. Совпадение с правкой — подтверждение уже сохранённого повтора.
+   * Всё читается и пишется в одной транзакции, поэтому при конфликте не меняется ни одно поле.
+   */
+  syncTask(id: string, base: unknown, changes: unknown): SyncTaskResult {
+    const taskId = requireId(id, 'Идентификатор задачи');
+    const fields = syncFields(checkSyncPatch(base, 'base'), checkSyncPatch(changes, 'changes'));
+    const baseValues = normalizeSyncValues(base as Record<string, unknown>, fields, 'base');
+    const changeValues = normalizeSyncValues(changes as Record<string, unknown>, fields, 'changes');
+
+    return this.tx(() => {
+      const current = this.mapTask(this.mutableTaskRow(taskId));
+      const conflicts: SyncTaskField[] = [];
+      const draft: TaskDraft = {};
+      let changed = false;
+
+      for (const field of fields) {
+        const stored = syncValueOf(current, field);
+        const wanted = changeValues[field];
+        if (stored === baseValues[field]) {
+          if (stored !== wanted) {
+            draft[field] = wanted;
+            changed = true;
+          }
+        } else if (stored !== wanted) {
+          conflicts.push(field);
+        }
+      }
+
+      if (conflicts.length > 0) return { task: current, conflicts };
+      // Повтор без новых изменений в базу не пишется: счётчик версий не растёт.
+      if (!changed) return { task: current, conflicts: [] };
+
+      const next = this.resolveTaskFields(draft, this.taskToValues(current), this.nowMs());
+      this.updateTaskValues(next);
+      return { task: this.getTask(taskId), conflicts: [] };
     });
   }
 

@@ -6,7 +6,7 @@
 
 **Органайзер рабочих и личных задач для Windows и Linux.** Веб-версия в разработке.
 
-[О рабочем дне](#как-проходит-рабочий-день) · [Первый выпуск](#первый-выпуск) · [Версия для Mac](https://github.com/pravoslavnaacerkovukrainy-tech/daylog/releases/tag/v0.2.14) · [Методика](https://github.com/pravoslavnaacerkovukrainy-tech/daylog/blob/v0.2.14/docs/methodology/2026-11-05-self-organization-under-uncertainty.md)
+[О рабочем дне](#как-проходит-рабочий-день) · [Первый выпуск](#первый-выпуск) · [Версия для Mac](https://github.com/pravoslavnaacerkovukrainy-tech/daylog/releases/tag/v0.2.14)
 
 ## Как проходит рабочий день
 

@@ -215,7 +215,13 @@ export interface EditorOptions {
 export function openTaskEditor(opts: EditorOptions): void {
   const { task, chaos } = opts;
   const title = task ? "Изменить задачу" : chaos ? "Это задача" : "Новая задача";
-  const modal = openModal(title, "task-editor");
+  // После отказа из-за чужой правки снимок на экране устарел. При закрытии окна берём
+  // свежий, иначе повторно открытая задача снова покажет старую версию.
+  let stale = false;
+  const markStale = () => (stale = true);
+  const modal = openModal(title, "task-editor", () => {
+    if (stale) void run(async () => undefined);
+  });
   const s = snap();
   const t = s.today;
 
@@ -342,6 +348,7 @@ export function openTaskEditor(opts: EditorOptions): void {
         // Черновик остаётся в полях окна. Повторно не отправляем: та же версия снова
         // получит отказ, а без проверки запись затёрла бы чужую правку.
         conflicted = true;
+        markStale();
         save.disabled = true;
         save.removeAttribute("data-submit");
         modal.dialog.setAttribute("data-conflict", "true");
@@ -357,7 +364,7 @@ export function openTaskEditor(opts: EditorOptions): void {
     h("div", { class: "field" }, h("span", { class: "field-label" }, "Сфера"), areaGroup),
     h("div", { class: "field" }, h("span", { class: "field-label" }, "День работы"), day, quickDays),
     extra,
-    task && task.is_open ? stepsEditor(task, modal.close) : null,
+    task && task.is_open ? stepsEditor(task, modal.close, markStale) : null,
     h("div", { class: "actions" },
       button("Отмена", () => modal.close(), { testid: "task-cancel" }),
       save),
@@ -375,7 +382,7 @@ function newId(): UUID {
 }
 
 /** Шаги сохраняются отдельной кнопкой и одной заменой списка, с проверкой версии задачи. */
-function stepsEditor(task: Task, closeEditor: () => void): HTMLElement {
+function stepsEditor(task: Task, closeEditor: () => void, onConflict: () => void): HTMLElement {
   let steps: TaskStep[] = (task.steps ?? []).map((s) => ({ ...s }));
   const list = h("ol", { class: "steps", testid: "steps-list" });
   const err = h("p", { class: "form-error", role: "alert", hidden: true, testid: "steps-error" });
@@ -392,6 +399,7 @@ function stepsEditor(task: Task, closeEditor: () => void): HTMLElement {
       closeEditor();
       await run(async () => undefined, "Шаги сохранены");
     } catch (e) {
+      if (isConflict(e)) onConflict();
       err.textContent = isConflict(e)
         ? "Задачу изменили в другом месте, пока окно было открыто. Шаги не сохранены, ваши правки остались здесь; закройте окно и откройте задачу заново, чтобы загрузить свежую версию."
         : e instanceof Error ? e.message : "Не удалось сохранить шаги.";

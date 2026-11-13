@@ -22,6 +22,7 @@ import {
   readJsonBody,
   readTextBody,
   sendError,
+  sendErrorData,
   sendFile,
   sendFromError,
   sendJson,
@@ -373,6 +374,21 @@ function buildRoutes(options: AppOptions): Route[] {
     }),
     route('DELETE', '/tasks/:id', (ctx) => {
       sendOk(ctx.res, { removed_task_id: store.deleteTask(requireParam(ctx, 'id')) });
+    }),
+
+    /* --- синхронизация отдельных полей --- */
+    route('POST', '/sync/tasks/:id', async (ctx) => {
+      const body = await ctx.json();
+      const result = store.syncTask(requireParam(ctx, 'id'), body.base, body.changes);
+      if (result.conflicts.length > 0) {
+        // Задача возвращается вместе с расхождением: очередь клиента живёт до явного решения.
+        sendErrorData(ctx.res, 409, 'sync_conflict', MESSAGES.syncConflict, {
+          task: result.task,
+          conflicts: result.conflicts,
+        });
+        return;
+      }
+      sendOk(ctx.res, { task: result.task });
     }),
 
     /* --- проекты --- */

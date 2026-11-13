@@ -57,6 +57,8 @@ interface Task {
   entry_id: UUID | null;
   created_at: Iso;
   updated_at: Iso;
+  /** Счётчик правок: растёт на каждое сохранение задачи. Нужен для base_revision. */
+  revision: number;
   /** Сервисные производные поля — читать можно, присылать нельзя. */
   is_completed: boolean;
   is_removed: boolean;
@@ -177,8 +179,9 @@ interface Snapshot {
 | 400 | `invalid_timezone` | Часовой пояс не принят `Intl`. |
 | 400 | `invalid_password` | Пароль короче 8 знаков или длиннее 512. |
 | 400 | `invalid_steps` | Шаги: больше 100, пустой текст, длиннее 500 знаков, повтор id или текста. |
-| 401 | `unauthorized` | Нет сессии или она истекла. Отдаётся на любой `/api/*`, кроме `/api/auth/state`, `/api/auth/setup`, `/api/auth/login`, `/api/health`. |
+| 401 | `unauthorized` | Нет сессии или она истекла. Отдаётся на любой `/api/*`, кроме `/api/health`, `/api/auth/state`, `/api/auth/setup`, `/api/auth/login` и `/api/dev/*`. |
 | 403 | `setup_already_done` | Пароль уже задан, `POST /api/auth/setup` больше не работает. |
+| 403 | `setup_required` | Вход до настройки пароля: сначала `POST /api/auth/setup`. |
 | 403 | `forbidden` | Действие недоступно в этом режиме. |
 | 404 | `not_found` | Нет объекта с таким id, или путь API не существует. |
 | 405 | `method_not_allowed` | Метод не поддерживается этим путём. |
@@ -216,7 +219,10 @@ interface Snapshot {
   Истёкшая или отозванная сессия даёт 401 на любой защищённый путь.
 - Без входа клиент не получает ни одного названия раздела: `GET /api/auth/state` возвращает только два булевых поля.
 - Подбор пароля ограничен: 5 неудач с одного адреса за 15 минут, дальше 429.
-- CSRF: `SameSite=Strict` плюс требование, чтобы все изменяющие запросы приходили с `Content-Type: application/json`.
+- CSRF: `SameSite=Strict` плюс требование, чтобы изменяющий запрос **с телом** объявлял
+  `Content-Type: application/json`, иначе `415 unsupported_media_type`. Запросы без тела
+  (например `POST /api/auth/logout`) этого не требуют.
+- Смена пароля (`POST /api/auth/password`) отзывает все сессии, включая текущую.
 
 ## 4. Запуск и переменные окружения
 
@@ -234,6 +240,7 @@ npm start                  # сервер + раздача client/dist
 | `PORT` | `3000` | Порт HTTP. |
 | `HOST` | `127.0.0.1` | Адрес прослушивания. Только localhost на этапе 1. |
 | `CHAOS_DAY_DATA_DIR` | `<repo>/.data` | Каталог файла `chaos-day.sqlite`. Зеркало `DAYLOG_DATA_DIR` Mac-версии. |
+| `CHAOS_DAY_DB_FILE` | `<data-dir>/chaos-day.sqlite` | Полный путь к файлу базы. `:memory:` даёт базу в памяти. |
 | `CHAOS_DAY_TIMEZONE` | `Europe/Kyiv` | Часовой пояс владельца при первом запуске; дальше хранится в базе. |
 | `CHAOS_DAY_SESSION_TTL_SEC` | `43200` | Время жизни сессии. |
 | `CHAOS_DAY_TESTING` | пусто | `1` включает `/api/dev/*` для приёмки. Без него эти пути отдают 403. |
@@ -264,6 +271,7 @@ CHAOS_DAY_DATA_DIR=/tmp/chaos-day-acceptance CHAOS_DAY_TESTING=1 CHAOS_DAY_ALLOW
 | `POST /api/auth/setup` | `{"password":string}` | `200 {"ok":true,"authenticated":true}` + cookie | 400 `invalid_password`, 403 `setup_already_done` |
 | `POST /api/auth/login` | `{"password":string}` | `200 {"ok":true,"authenticated":true}` + cookie | 401 `unauthorized`, 429 `too_many_attempts` |
 | `POST /api/auth/logout` | — | `200 {"ok":true,"authenticated":false}` + очистка cookie | — |
+| `POST /api/auth/password` | `{"current_password":string,"next_password":string}` | `200 {"ok":true,"authenticated":false}`, все сессии отзываются | 400 `invalid_password`, 401 `unauthorized`, 403 `setup_required` |
 
 Неудачный вход отдаёт тот же `unauthorized` с нейтральным `message` «Неверный пароль.» —
 сервер не сообщает, существует ли учётная запись.
@@ -328,7 +336,7 @@ CHAOS_DAY_DATA_DIR=/tmp/chaos-day-acceptance CHAOS_DAY_TESTING=1 CHAOS_DAY_ALLOW
 | `POST /api/tasks/:id/remove` | `{"reason":string}` | `{"ok":true,"data":{"task":Task}}` |
 | `POST /api/tasks/:id/return-to-work` | — | `{"ok":true,"data":{"task":Task}}` |
 | `POST /api/tasks/:id/at-risk` | `{"at_risk":bool}` | `{"ok":true,"data":{"task":Task}}` |
-| `POST /api/tasks/:id/steps` | `{"steps":TaskStep[],"base_updated_at":Iso}` | `{"ok":true,"data":{"task":Task}}` |
+| `POST /api/tasks/:id/steps` | `{"steps":TaskStep[],"base_revision"?:number,"base_updated_at"?:Iso}` | `{"ok":true,"data":{"task":Task}}` |
 | `DELETE /api/tasks/:id` | — | `{"ok":true,"data":{"removed_task_id":UUID}}` |
 
 Гарантии правил:
@@ -349,9 +357,12 @@ CHAOS_DAY_DATA_DIR=/tmp/chaos-day-acceptance CHAOS_DAY_TESTING=1 CHAOS_DAY_ALLOW
   Снятую задачу нельзя править и выполнять до возврата.
 - **`return-to-work`** ставит `status: "ready"` и стирает прежнюю причину, чтобы она не выглядела текущей.
 - **`at-risk`** не меняет статус и даты, ничего не уведомляет и не двигает остальные дела.
-- **`steps`** заменяет весь список одним сохранением и требует `base_updated_at` текущего состояния
-  задачи: при расхождении — `409 conflicting_changes`, правки клиента не затираются.
-  Проверки: не больше 100 шагов, текст непустой и не длиннее 500 знаков, без повторов id и текста.
+- **`steps`** заменяет весь список одним сохранением. Основание для оптимистичной блокировки —
+  `base_revision` (счётчик правок задачи, который сервер отдаёт в `Task.revision`) либо, если его
+  нет, `base_updated_at`. При расхождении — `409 conflicting_changes`, правки клиента не затираются.
+  Счётчик надёжнее отметки времени: две правки в пределах одной секунды он всё равно различает.
+  Если не прислано ни одно из двух полей, проверка конфликта не выполняется.
+  Ограничения списка: не больше 100 шагов, текст непустой и не длиннее 500 знаков, без повторов id и текста.
   Выполненную задачу править нельзя — сначала `reopen`.
 - **`DELETE`** отклоняется с `409 parent_has_steps`, пока шаги явно не удалены и список не сохранён.
   Каскадного удаления нет. Удаление задачи сохраняет запись дневника.
@@ -455,13 +466,16 @@ interface ImportReport {
 | `POST /api/dev/fault` | `{"inject":"save","times":number}` | Следующие N записей в хранилище завершатся ошибкой `500 save_failed` и полным откатом. Нужно для проверки «ошибка сохранения» и атомарности разбора строки. |
 | `GET /api/dev/now` | `?shift_days=number` | Не меняет данные; возвращает `{"ok":true,"data":{"today":DayKey,"now":Iso}}` для сверки календарной логики. |
 
-Без `CHAOS_DAY_TESTING=1` все четыре пути отдают `403 forbidden`. Управляемая ошибка сохраняется
-только в памяти процесса и не переживает перезапуск.
+Пути `/api/dev/*` не требуют сессии: приёмке нужно сбрасывать хранилище и задавать пароль до входа.
+Вместо этого они доступны только при `CHAOS_DAY_TESTING=1`, иначе отдают `403 forbidden`.
+Управляемая ошибка дополнительно требует `CHAOS_DAY_ALLOW_FAULTS=1` и живёт только в памяти
+процесса — перезапуск её снимает.
 
 ## 6. Тесты и fixtures
 
-`npm test` запускает `node --test tests/`. Проверки идут без браузера и без сети, на вымышленных делах.
-Боевой `entries.json`, ключи и личные заметки не читаются и в репозиторий не кладутся.
+`npm test` запускает `node --test "tests/**/*.test.ts"`. Проверки идут без браузера и без сети,
+на вымышленных делах. Боевой `entries.json`, ключи и личные заметки не читаются и в репозиторий
+не кладутся.
 
 | Файл проверок | Что закрывает |
 |---|---|
@@ -514,3 +528,7 @@ API под `/api/*`, httpOnly cookie и 401 на любой `/api` без вхо
 4. Разбор строки — `POST /api/chaos/:id/to-task` и `/to-note`, снятие строки — `DELETE /api/chaos/:id`.
 5. Запрос Kimi закрыт разделом 5.10 и переменными `CHAOS_DAY_TESTING`, `CHAOS_DAY_ALLOW_FAULTS`,
    `CHAOS_DAY_DATA_DIR`; импорт синтетических v1/v9 — тот же `POST /api/import`.
+6. У задачи есть счётчик правок `revision`. Сохранение шагов присылает его обратно как
+   `base_revision` — это защита от затирания чужих правок двумя окнами.
+7. Обёртка `{"ok":true,"data":…}` действует для данных. Служебные пути `/api/health` и
+   `/api/auth/state|setup|login|logout|password` отвечают плоским JSON, как в черновике Claude.

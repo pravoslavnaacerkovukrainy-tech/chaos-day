@@ -4,13 +4,7 @@ import { ApiError } from './errors.ts';
 export const JSON_BODY_LIMIT = 8 * 1024 * 1024;
 export const IMPORT_BODY_LIMIT = 64 * 1024 * 1024;
 
-export interface JsonEnvelope {
-  error?: { code: string; message: string };
-  ok?: true;
-  data?: unknown;
-}
-
-export function sendJson(res: ServerResponse, status: number, payload: JsonEnvelope): void {
+export function sendJson(res: ServerResponse, status: number, payload: Record<string, unknown>): void {
   const body = Buffer.from(JSON.stringify(payload), 'utf8');
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',

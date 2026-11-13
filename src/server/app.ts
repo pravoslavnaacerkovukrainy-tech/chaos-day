@@ -365,7 +365,10 @@ function buildRoutes(options: AppOptions): Route[] {
       const body = await ctx.json();
       sendOk(
         ctx.res,
-        store.replaceTaskSteps(requireParam(ctx, 'id'), body.steps, body.base_updated_at),
+        store.replaceTaskSteps(requireParam(ctx, 'id'), body.steps, {
+          revision: body.base_revision,
+          updated_at: body.base_updated_at,
+        }),
       );
     }),
     route('DELETE', '/tasks/:id', (ctx) => {
@@ -774,7 +777,10 @@ export function createApp(options: AppOptions) {
 }
 
 export function createNodeServer(options: AppOptions): Server {
+  // Обработчик и его состояние (в том числе счётчик подбора пароля) создаются один раз,
+  // а не на каждый запрос.
+  const handle = createApp(options);
   return createServer((req, res) => {
-    void createApp(options)(req, res);
+    void handle(req, res);
   });
 }

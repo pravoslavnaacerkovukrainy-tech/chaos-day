@@ -2,9 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
-export const SCHEMA = `
+const SCHEMA_TABLES = `
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   completed_at   INTEGER,
   entry_id       TEXT,
   created_at     INTEGER NOT NULL,
-  updated_at     INTEGER NOT NULL
+  updated_at     INTEGER NOT NULL,
+  revision       INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS entries (
@@ -92,7 +93,9 @@ CREATE TABLE IF NOT EXISTS chaos (
   urgent     INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
+`;
 
+const SCHEMA_INDEXES = `
 CREATE INDEX IF NOT EXISTS idx_tasks_day ON tasks(day);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
@@ -103,7 +106,25 @@ CREATE INDEX IF NOT EXISTS idx_entries_timestamp ON entries(timestamp);
 CREATE INDEX IF NOT EXISTS idx_entries_plan ON entries(plan_id);
 CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+/* Любой UPDATE задачи увеличивает revision. Счётчик нужен, чтобы правка шагов
+   из второго окна обнаруживалась даже внутри одной секунды: отметка времени
+   для этого слишком грубая. Рекурсивные триггеры выключены, поэтому внутреннее
+   обновление триггер повторно не запускает. */
+CREATE TRIGGER IF NOT EXISTS tasks_bump_revision
+AFTER UPDATE ON tasks
+FOR EACH ROW
+BEGIN
+  UPDATE tasks SET revision = OLD.revision + 1 WHERE id = NEW.id;
+END;
 `;
+
+export const SCHEMA = `${SCHEMA_TABLES}\n${SCHEMA_INDEXES}`;
+
+function taskColumns(db: DatabaseSync): Set<string> {
+  const rows = db.prepare('SELECT name FROM pragma_table_info(\'tasks\')').all() as { name: string }[];
+  return new Set(rows.map((row) => row.name));
+}
 
 /**
  * Открывает хранилище и доводит схему до текущего состояния.
@@ -116,11 +137,19 @@ export function openDatabase(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA foreign_keys = ON');
-  db.exec(SCHEMA);
-  db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING').run(
-    'schema_version',
-    String(SCHEMA_VERSION),
-  );
+  // Триггер revision должен срабатывать один раз на обновление, а не по цепочке.
+  db.exec('PRAGMA recursive_triggers = OFF');
+
+  db.exec(SCHEMA_TABLES);
+  // База, созданная до появления счётчика версий, доводится до текущей схемы.
+  if (!taskColumns(db).has('revision')) {
+    db.exec('ALTER TABLE tasks ADD COLUMN revision INTEGER NOT NULL DEFAULT 0');
+  }
+  db.exec(SCHEMA_INDEXES);
+
+  db.prepare(
+    'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+  ).run('schema_version', String(SCHEMA_VERSION));
   return db;
 }
 

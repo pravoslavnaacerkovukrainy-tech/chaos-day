@@ -56,16 +56,17 @@ export function ids(items: readonly { id: string }[]): string[] {
 }
 
 /** Проверяет, что вызов бросает ApiError с ожидаемым кодом. */
-export function throwsCode(fn: () => unknown, code: string): ApiError {
+export function throwsCode(fn: () => unknown, code: string, note?: string): ApiError {
   let caught: unknown;
   try {
     fn();
   } catch (error) {
     caught = error;
   }
-  assert.ok(caught !== undefined, `ожидалась ошибка ${code}, но вызов завершился успешно`);
-  assert.ok(caught instanceof ApiError, `ожидалась ApiError, получено ${String(caught)}`);
-  assert.equal(caught.code, code);
+  const label = note === undefined ? code : `${code} (${note})`;
+  assert.ok(caught !== undefined, `ожидалась ошибка ${label}, но вызов завершился успешно`);
+  assert.ok(caught instanceof ApiError, `ожидалась ApiError ${label}, получено ${String(caught)}`);
+  assert.equal(caught.code, code, note);
   return caught;
 }
 

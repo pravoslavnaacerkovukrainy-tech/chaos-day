@@ -63,6 +63,8 @@ export interface Task {
   entry_id: UUID | null;
   created_at: Iso;
   updated_at: Iso;
+  /** Счётчик правок задачи. Растёт на каждое сохранение, нужен для конфликта шагов. */
+  revision: number;
   is_completed: boolean;
   is_removed: boolean;
   is_open: boolean;

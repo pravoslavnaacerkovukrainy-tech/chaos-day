@@ -264,6 +264,9 @@ const TASK_UPDATE_SET = TASK_SQL_COLUMNS.split(',')
   .filter((clause) => !clause.startsWith('id ='))
   .join(', ');
 
+/** Счётчик версий пишет триггер, поэтому в INSERT и UPDATE он не входит. */
+const TASK_SELECT_COLUMNS = `${TASK_SQL_COLUMNS}, revision`;
+
 export interface TaskDraft {
   text?: unknown;
   day?: unknown;
@@ -276,6 +279,18 @@ export interface TaskDraft {
   promised_to?: unknown;
   at_risk?: unknown;
   details?: unknown;
+}
+
+/** Основание для оптимистичной блокировки: счётчик версий или отметка времени задачи. */
+export interface StepsBase {
+  revision?: unknown;
+  updated_at?: unknown;
+}
+
+function normalizeStepsBase(base: StepsBase | string | null | undefined): StepsBase | undefined {
+  if (base === undefined || base === null) return undefined;
+  if (typeof base === 'string') return { updated_at: base };
+  return base;
 }
 
 /* ------------------------------------------------------------------ */
@@ -448,7 +463,7 @@ export class Store {
 
   changePassword(currentPassword: unknown, nextPassword: unknown): void {
     const row = this.one('SELECT password_hash FROM auth WHERE id = 1');
-    if (!row) throw new ApiError(403, 'setup_already_done', 'Пароль ещё не задан.');
+    if (!row) throw new ApiError(403, 'setup_required', 'Пароль ещё не задан.');
     if (!verifyPassword(String(currentPassword ?? ''), str(row, 'password_hash'))) {
       throw new ApiError(401, 'unauthorized', MESSAGES.wrongPassword);
     }
@@ -538,6 +553,7 @@ export class Store {
       entry_id: strOrNull(row, 'entry_id'),
       created_at: requireIso(numOrNull(row, 'created_at'), 'created_at'),
       updated_at: requireIso(numOrNull(row, 'updated_at'), 'updated_at'),
+      revision: num(row, 'revision'),
       is_completed: completedAt !== null,
       is_removed: status === 'removed',
       is_open: completedAt === null && status !== 'removed',
@@ -605,11 +621,11 @@ export class Store {
   /* ---------------- задачи: чтение ---------------- */
 
   listTasks(): Task[] {
-    return this.all(`SELECT ${TASK_SQL_COLUMNS} FROM tasks`).map((row) => this.mapTask(row));
+    return this.all(`SELECT ${TASK_SELECT_COLUMNS} FROM tasks`).map((row) => this.mapTask(row));
   }
 
   getTaskRow(id: string): Row | undefined {
-    return this.one(`SELECT ${TASK_SQL_COLUMNS} FROM tasks WHERE id = ?`, id);
+    return this.one(`SELECT ${TASK_SELECT_COLUMNS} FROM tasks WHERE id = ?`, id);
   }
 
   getTask(id: string): Task {
@@ -626,8 +642,8 @@ export class Store {
 
   private updateTaskValues(values: TaskValues): void {
     const params = taskValuesToParams(values);
-    const id = params.shift();
-    this.run(`UPDATE tasks SET ${TASK_UPDATE_SET} WHERE id = ?`, ...params, id);
+    params.shift();
+    this.run(`UPDATE tasks SET ${TASK_UPDATE_SET} WHERE id = ?`, ...params, values.id);
   }
 
   /**
@@ -908,7 +924,7 @@ export class Store {
     });
   }
 
-  replaceTaskSteps(id: string, steps: unknown, baseUpdatedAt: unknown): Task {
+  replaceTaskSteps(id: string, steps: unknown, base?: StepsBase | string | null): Task {
     const taskId = requireId(id, 'Идентификатор задачи');
     return this.tx(() => {
       const row = this.getTaskRow(taskId);
@@ -916,12 +932,7 @@ export class Store {
       if (numOrNull(row, 'completed_at') !== null) {
         throw new ApiError(409, 'task_is_completed', MESSAGES.taskIsCompleted);
       }
-      const currentUpdatedAt = requireIso(numOrNull(row, 'updated_at'), 'updated_at');
-      if (baseUpdatedAt !== undefined && baseUpdatedAt !== null && baseUpdatedAt !== '') {
-        if (String(baseUpdatedAt) !== currentUpdatedAt) {
-          throw new ApiError(409, 'conflicting_changes', MESSAGES.conflictingChanges);
-        }
-      }
+      this.assertStepsBase(row, normalizeStepsBase(base));
       const checked = checkSteps(steps);
       this.run(
         'UPDATE tasks SET steps_json = ?, updated_at = ? WHERE id = ?',
@@ -931,6 +942,27 @@ export class Store {
       );
       return this.getTask(taskId);
     });
+  }
+
+  /**
+   * Сохранённый список не затирается чужими правками. Счётчик версий надёжнее отметки
+   * времени: две правки в пределах одной секунды он всё равно различает.
+   */
+  private assertStepsBase(row: Row, base?: StepsBase): void {
+    const revision = base?.revision;
+    if (revision !== undefined && revision !== null && revision !== '') {
+      if (Number(revision) !== num(row, 'revision')) {
+        throw new ApiError(409, 'conflicting_changes', MESSAGES.conflictingChanges);
+      }
+      return;
+    }
+    const updatedAt = base?.updated_at;
+    if (updatedAt !== undefined && updatedAt !== null && updatedAt !== '') {
+      const current = requireIso(numOrNull(row, 'updated_at'), 'updated_at');
+      if (String(updatedAt) !== current) {
+        throw new ApiError(409, 'conflicting_changes', MESSAGES.conflictingChanges);
+      }
+    }
   }
 
   /** Задачу с шагами нельзя удалить, пока шаги явно не удалены. Каскадного удаления нет. */

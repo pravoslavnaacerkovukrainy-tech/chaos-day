@@ -9,7 +9,8 @@ import { showError } from "../ui.ts";
 import { empty, header, areaFilter } from "./common.ts";
 import { searchBox } from "./search.ts";
 
-let cache: { date: DayKey; tasks: Task[]; stamp: string } | null = null;
+/** Ответ /api/day действителен только для той версии данных, при которой его запросили. */
+let cache: { date: DayKey; tasks: Task[]; version: number } | null = null;
 
 export function planView(): HTMLElement {
   const s = snap();
@@ -27,7 +28,7 @@ export function planView(): HTMLElement {
   });
 
   const body = h("div", { class: "plan-body", testid: "plan-list-wrap", "aria-busy": "true" });
-  const stamp = s.now + ":" + s.tasks.length + ":" + s.tasks.map((x) => x.updated_at).join("");
+  const version = app.version;
   const fill = (tasks: Task[]) => {
     body.removeAttribute("aria-busy");
     const visible = tasks.filter((x) => areaMatches(x.area)).sort(taskOrder);
@@ -44,12 +45,13 @@ export function planView(): HTMLElement {
         : empty(isToday ? "На сегодня задач нет. Сейчас здесь ничего нет." : "На этот день задач нет. Сейчас здесь ничего нет.", "plan-empty"),
     );
   };
-  if (cache && cache.date === day && cache.stamp === stamp) fill(cache.tasks);
+  if (cache && cache.date === day && cache.version === version) fill(cache.tasks);
   else {
-    if (cache && cache.date === day) fill(cache.tasks);
-    else body.append(h("p", { class: "quiet" }, "Загрузка…"));
+    // После изменения прежний ответ устарел: не показываем его, а спрашиваем сервер заново.
+    body.append(h("p", { class: "quiet", testid: "plan-loading" }, "Загрузка…"));
     api.day(day).then((res) => {
-      cache = { date: day, tasks: res.tasks, stamp };
+      if (version !== app.version) return; // ответ на запрос до изменения
+      cache = { date: day, tasks: res.tasks, version };
       if (body.isConnected) fill(res.tasks);
     }, (err) => {
       body.replaceChildren(h("p", { class: "form-error", role: "alert" }, "Не удалось загрузить план."));

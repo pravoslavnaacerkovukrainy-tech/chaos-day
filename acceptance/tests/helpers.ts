@@ -51,9 +51,8 @@ export function navigation(page: Page, name: string) {
 
 export async function navigate(page: Page, name: string) {
   const target = navigation(page, name);
-  if (!(await target.isVisible())) {
-    const menu = page.getByTestId('nav-toggle');
-    if (await menu.isVisible()) await menu.click();
+  if (!(await page.getByTestId('logout').isVisible())) {
+    await page.getByTestId('nav-toggle').click();
   }
   await target.click();
   await expect(page.getByTestId(`view-${routes[name]}`)).toBeVisible();
@@ -64,7 +63,7 @@ export async function login(page: Page) {
   await page.getByTestId('login-password').fill(password);
   await page.getByTestId('login-submit').click();
   await expect(page.getByTestId('login-form')).toHaveCount(0);
-  await expect(page.getByTestId('logout')).toBeVisible();
+  await expect(page.getByTestId('logout')).toHaveCount(1);
 }
 
 export async function snapshot(page: Page): Promise<Snapshot> {

@@ -239,14 +239,27 @@ function noteEditor(note: Note | null): HTMLElement {
   }, { class: "primary", testid: "note-save" });
 
   // Переключение не теряет черновик: текст уже в editing, режим просто перерисовывает панель.
-  const setMode = (m: typeof mode) => {
+  const setMode = (m: typeof mode, keepFocus = false) => {
     if (mode === m) return;
     mode = m;
     app.rerender();
+    // С клавиатуры фокус остаётся на выбранной вкладке и после перерисовки.
+    if (keepFocus) document.querySelector<HTMLElement>(`[data-testid="note-mode-${m}"]`)?.focus();
   };
-  const tabs = h("div", { class: "segmented", role: "tablist", "aria-label": "Режим заметки" },
-    button("Просмотр", () => setMode("view"), { role: "tab", "aria-selected": String(mode === "view"), "aria-controls": "note-panel", testid: "note-mode-view" }),
-    button("Редактор", () => setMode("edit"), { role: "tab", "aria-selected": String(mode === "edit"), "aria-controls": "note-panel", testid: "note-mode-edit" }));
+  const tab = (m: typeof mode, label: string) => button(label, () => setMode(m), {
+    role: "tab", "aria-selected": String(mode === m), "aria-controls": "note-panel",
+    tabindex: mode === m ? "0" : "-1", testid: `note-mode-${m}`,
+  });
+  const tabs = h("div", { class: "segmented", role: "tablist", "aria-label": "Режим заметки" }, tab("view", "Просмотр"), tab("edit", "Редактор"));
+  // Две вкладки: стрелки, Home и End переключают режим сразу.
+  tabs.addEventListener("keydown", (ev) => {
+    const target = ev.key === "ArrowLeft" || ev.key === "Home" ? "view"
+      : ev.key === "ArrowRight" || ev.key === "End" ? "edit" : null;
+    if (!target) return;
+    ev.preventDefault();
+    if (mode === target) document.querySelector<HTMLElement>(`[data-testid="note-mode-${target}"]`)?.focus();
+    else setMode(target, true);
+  });
 
   const content = mode === "edit"
     ? h("div", { class: "note-edit", id: "note-panel", role: "tabpanel", "aria-label": "Редактор" }, title, formatBar(body), body)
@@ -261,7 +274,8 @@ function noteEditor(note: Note | null): HTMLElement {
     h("div", { class: "note-toolbar" }, tabs, move,
       note ? button(note.pinned ? "Открепить" : "Закрепить", () => void run(() => api.updateNote(note.id, { pinned: !note.pinned }), note.pinned ? "Заметка откреплена" : "Заметка закреплена"), { class: "ghost", testid: "note-pin" }) : null),
     content,
-    h("div", { class: "actions start" },
+    // Действия только в Редакторе: Просмотр — чистое чтение, без нижнего ряда.
+    mode !== "edit" ? null : h("div", { class: "actions start", testid: "note-actions" },
       save,
       dirty() ? button("Отменить правки", () => {
         editing.delete(key);

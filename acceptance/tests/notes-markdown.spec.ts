@@ -60,6 +60,13 @@ async function noHorizontalPageScroll(page: Page) {
   expect(scroll, 'страница не растягивается по ширине').toBeLessThanOrEqual(client);
 }
 
+async function expectNoActions(page: Page) {
+  await expect(page.getByTestId('note-view')).toBeVisible();
+  for (const id of ['note-actions', 'note-save', 'note-delete', 'note-discard']) {
+    await expect(page.getByTestId(id), `${id} нет в Просмотре`).toHaveCount(0);
+  }
+}
+
 test.beforeEach(async ({ request }) => {
   await bootstrap(request);
 });
@@ -94,15 +101,21 @@ test('новая заметка: Просмотр до сохранения, с�
   await expect(view.locator('img')).toHaveCount(0);
   await expect(view.getByRole('link', { name: 'Картинка: схема' })).toHaveAttribute('href', 'https://example.org/scheme.png');
   await expect(page.getByTestId('note-unsaved')).toBeVisible();
+  await expectNoActions(page);
   await noHorizontalPageScroll(page);
 
   await page.getByTestId('note-mode-edit').click();
   await expect(page.getByTestId('note-body-input')).toHaveValue(MARKDOWN);
   await expect(page.getByTestId('note-title-input')).toHaveValue('Встреча');
+  // В Редакторе новой заметки: Сохранить и Отменить правки, Удалить нет.
+  await expect(page.getByTestId('note-save')).toBeVisible();
+  await expect(page.getByTestId('note-discard')).toBeVisible();
+  await expect(page.getByTestId('note-delete')).toHaveCount(0);
 
   await page.getByTestId('note-save').click();
   await expect(page.getByTestId('note-view')).toBeVisible();
   await expect(page.getByTestId('note-unsaved')).toHaveCount(0);
+  await expectNoActions(page);
 
   // Сохраняется сырой Markdown, без преобразований.
   const saved = await notes(page);
@@ -114,17 +127,71 @@ test('новая заметка: Просмотр до сохранения, с�
   await expect(page.getByTestId('logout')).toHaveCount(1);
   await navigate(page, 'Заметки');
   await page.getByTestId('note-item').filter({ hasText: 'Встреча' }).click();
-  // Сохранённая заметка открывается в Просмотре.
+  // Сохранённая заметка открывается в Просмотре, без нижнего ряда действий; Папка и Закрепить сверху.
   await expect(page.getByTestId('note-mode-view')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('note-rendered').locator('h2')).toHaveText('План встречи');
+  await expectNoActions(page);
+  await expect(page.getByTestId('note-folder')).toBeVisible();
+  await expect(page.getByTestId('note-pin')).toBeVisible();
   await page.getByTestId('note-mode-edit').click();
   await expect(page.getByTestId('note-body-input')).toHaveValue(MARKDOWN);
+  // В Редакторе сохранённой заметки есть Сохранить и Удалить, Отменить правки — после правки.
+  await expect(page.getByTestId('note-save')).toBeVisible();
+  await expect(page.getByTestId('note-delete')).toBeVisible();
+  await expect(page.getByTestId('note-discard')).toHaveCount(0);
+  await page.getByTestId('note-title-input').fill('Встреча (черновик)');
+  await page.getByTestId('note-mode-view').click();
+  await expectNoActions(page);
+  await page.getByTestId('note-mode-edit').click();
+  await expect(page.getByTestId('note-title-input')).toHaveValue('Встреча (черновик)');
+  await expect(page.getByTestId('note-discard')).toBeVisible();
+  await page.getByTestId('note-discard').click();
+  await expect(page.getByTestId('note-rendered').locator('h2')).toHaveText('План встречи');
 
   // Поиск по заметкам ищет по исходному тексту.
   await page.getByTestId('notes-search').fill('второй пункт');
   await expect(page.getByTestId('note-item')).toHaveCount(1);
 
   expect(external, 'из заметки ничего не загружается').toEqual([]);
+});
+
+test('новая заметка: папка и фокус вкладок переживают переключение режимов', async ({ page }) => {
+  await login(page);
+  const created = await page.request.post('/api/note-folders', { data: { name: 'Проба', parent_id: null } });
+  expect(created.status()).toBeLessThan(300);
+  const folderId: string = (await created.json()).data.note_folder.id;
+  // Папка создана прямым запросом — снимок нужно перечитать.
+  await page.reload();
+  await expect(page.getByTestId('logout')).toHaveCount(1);
+  await navigate(page, 'Заметки');
+  await page.getByTestId('note-new').click();
+  await page.getByTestId('note-body-input').fill('Текст для папки');
+  await page.getByTestId('note-folder').selectOption(folderId);
+
+  // Клавиатура: стрелки переключают режим, фокус остаётся на выбранной вкладке.
+  const edit = page.getByTestId('note-mode-edit');
+  const view = page.getByTestId('note-mode-view');
+  await expect(edit).toHaveAttribute('tabindex', '0');
+  await expect(view).toHaveAttribute('tabindex', '-1');
+  await edit.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(view).toHaveAttribute('aria-selected', 'true');
+  await expect(view).toBeFocused();
+  await expect(view).toHaveAttribute('tabindex', '0');
+  await expectNoActions(page);
+  await expect(page.getByTestId('note-folder')).toHaveValue(folderId);
+  await page.keyboard.press('End');
+  await expect(edit).toHaveAttribute('aria-selected', 'true');
+  await expect(edit).toBeFocused();
+  await expect(page.getByTestId('note-folder')).toHaveValue(folderId);
+  await expect(page.getByTestId('note-body-input')).toHaveValue('Текст для папки');
+
+  await page.getByTestId('note-save').click();
+  await expectNoActions(page);
+  await expect.poll(async () => {
+    const r = await page.request.get('/api/state');
+    return (await r.json()).data.notes.map((n: { body: string; folder_id: string | null }) => [n.body, n.folder_id]);
+  }).toEqual([['Текст для папки', folderId]]);
 });
 
 test('HTML в заметке показывается текстом и не исполняется', async ({ page }) => {
@@ -201,9 +268,11 @@ test('панель форматирования: выделение, клави�
   await page.keyboard.press('End');
   await expect(bar.getByRole('button', { name: 'Ссылка' })).toBeFocused();
 
-  // Черновик переживает Просмотр, затем сохраняется.
+  // Черновик переживает Просмотр, затем сохраняется из Редактора.
   await page.getByTestId('note-mode-view').click();
   await expect(page.getByTestId('note-rendered').locator('em')).toHaveText('мой');
+  await expectNoActions(page);
+  await page.getByTestId('note-mode-edit').click();
   await page.getByTestId('note-save').click();
   await expect.poll(async () => (await notes(page)).map((n) => n.body)).toEqual(['_мой_ текст']);
 });

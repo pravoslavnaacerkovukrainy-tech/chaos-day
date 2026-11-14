@@ -109,6 +109,12 @@
 `folder-tree`, `folder-item`, `folder-new`, `folder-new-sub`, `folder-rename`, `folder-delete`,
 окно `folder-dialog`: `folder-name-input`, `folder-save`, `folder-cancel`.
 
+Markdown: `note-rendered` — отрисованный текст в Просмотре (HTML не интерпретируется, картинки — ссылки),
+`note-unsaved` — пометка в Просмотре несохранённой заметки. Вкладки `note-mode-view` / `note-mode-edit` есть и у новой заметки.
+Панель форматирования `note-format-bar` (`role=toolbar`, стрелки внутри): `note-format-heading`, `note-format-bold`,
+`note-format-italic`, `note-format-bullet`, `note-format-ordered`, `note-format-quote`, `note-format-code`, `note-format-link`.
+Клавиши в поле текста: ⌘/Ctrl+B, ⌘/Ctrl+I, ⌘/Ctrl+K.
+
 ## Дневник
 
 `diary-input`, `diary-context-input`, `diary-time-input`, `diary-save`, `diary-prev`, `diary-today`, `diary-next`,
